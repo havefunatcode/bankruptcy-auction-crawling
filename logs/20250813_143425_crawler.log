@@ -1,5 +1,0 @@
-2025-08-13 14:34:28,482 - crawler.pagination_handler - INFO - Starting to crawl from page 1
-2025-08-13 14:34:31,270 - crawler.pagination_handler - INFO - Found 10 items on page 1
-2025-08-13 14:34:35,130 - crawler.pagination_handler - INFO - Found 10 items on page 2
-2025-08-13 14:34:36,131 - crawler.pagination_handler - INFO - Reached maximum pages limit (2)
-2025-08-13 14:34:36,132 - crawler.pagination_handler - INFO - Crawling completed. Total items collected: 20

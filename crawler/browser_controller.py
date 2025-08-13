@@ -6,7 +6,7 @@ import time
 from typing import Optional
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 from utils.logger import setup_logger
-from config import HEADLESS, BROWSER_TYPE, PAGE_LOAD_TIMEOUT, DELAY_BETWEEN_REQUESTS
+from config import HEADLESS, BROWSER_TYPE, PAGE_LOAD_TIMEOUT, DELAY_BETWEEN_REQUESTS, BASE_URL
 
 
 class BrowserController:
@@ -72,11 +72,19 @@ class BrowserController:
         try:
             self.logger.info(f"Navigating to page {page_num}")
             
-            # For page 1, just reload the page
+            # For page 1, ensure we're on the main list page
             if page_num == 1:
-                await self.page.reload(wait_until='networkidle')
-                await self.delay()
+                await self.navigate_to_url(BASE_URL)
                 return True
+            
+            # First ensure we're on the main list page
+            current_url = await self.get_current_url()
+            if 'RealNoticeList.work' not in current_url:
+                await self.navigate_to_url(BASE_URL)
+                await asyncio.sleep(2)  # Give more time for page to stabilize
+            
+            # Wait for page to fully load and stabilize
+            await asyncio.sleep(1)
             
             # Look for pagination links - this site uses JavaScript function calls
             # Check if page link exists
@@ -87,15 +95,53 @@ class BrowserController:
                 await self.delay()
                 return True
             else:
-                # Try to navigate using form submission
-                form_script = f"""
-                document.frm.pageIndex.value = '{page_num}';
-                document.frm.submit();
+                # Try to navigate using form submission with better error handling
+                form_check_script = """
+                try {
+                    if (typeof document !== 'undefined' && 
+                        typeof document.frm !== 'undefined' && 
+                        document.frm && 
+                        typeof document.frm.pageIndex !== 'undefined' &&
+                        document.frm.pageIndex) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                } catch (e) {
+                    return false;
+                }
                 """
-                await self.page.evaluate(form_script)
-                await self.page.wait_for_load_state('networkidle')
-                await self.delay()
-                return True
+                
+                # Wait a bit more and try multiple times
+                for attempt in range(3):
+                    form_exists = await self.page.evaluate(form_check_script)
+                    if form_exists:
+                        break
+                    self.logger.debug(f"Form not ready on attempt {attempt + 1}, waiting...")
+                    await asyncio.sleep(1)
+                
+                if form_exists:
+                    form_script = f"""
+                    try {{
+                        document.frm.pageIndex.value = '{page_num}';
+                        document.frm.submit();
+                        return true;
+                    }} catch (e) {{
+                        console.error('Form submission error:', e);
+                        return false;
+                    }}
+                    """
+                    result = await self.page.evaluate(form_script)
+                    if result:
+                        await self.page.wait_for_load_state('networkidle')
+                        await self.delay()
+                        return True
+                    else:
+                        self.logger.warning(f"Form submission failed for page {page_num}")
+                        return False
+                else:
+                    self.logger.warning(f"Form not found for page navigation to page {page_num}")
+                    return False
                     
         except Exception as e:
             self.logger.error(f"Failed to navigate to page {page_num}: {e}")
@@ -170,24 +216,91 @@ class BrowserController:
     async def navigate_to_detail_page(self, notice_link_href: str) -> bool:
         """Navigate to a specific notice detail page"""
         try:
-            self.logger.info(f"Navigating to detail page")
+            self.logger.info(f"Navigating to detail page: {notice_link_href}")
             
-            # Find the link with matching href
-            link_selector = f'a[href="{notice_link_href}"]'
-            detail_link = await self.page.query_selector(link_selector)
+            # Wait for page to stabilize
+            await asyncio.sleep(1)
+            
+            # Verify we're on the list page
+            current_url = await self.get_current_url()
+            if 'RealNoticeView' in current_url:
+                # We're already on a detail page, go back first
+                await self.go_back_to_list()
+                await asyncio.sleep(1)
+            
+            # Extract seq_id from the href for better matching
+            seq_id = None
+            if 'seq_id=' in notice_link_href:
+                seq_id = notice_link_href.split('seq_id=')[1].split('&')[0]
+                self.logger.debug(f"Extracted seq_id: {seq_id}")
+            
+            # Try multiple selector strategies with more specific patterns
+            selectors = [
+                f'a[href="{notice_link_href}"]',  # Exact match
+                f'a[href*="seq_id={seq_id}"]' if seq_id else None,  # Match by seq_id
+                f'a[href*="{seq_id}"]' if seq_id else None,  # Partial seq_id match
+            ]
+            
+            # Remove None selectors
+            selectors = [s for s in selectors if s]
+            
+            detail_link = None
+            for i, selector in enumerate(selectors):
+                self.logger.debug(f"Trying selector {i+1}: {selector}")
+                detail_link = await self.page.query_selector(selector)
+                if detail_link:
+                    self.logger.debug(f"Found link with selector {i+1}")
+                    break
             
             if detail_link:
                 # Get link text for logging
                 link_text = await detail_link.text_content()
                 self.logger.info(f"Clicking detail link: '{link_text.strip()}'")
                 
-                # Click the link
+                # Verify the link is visible and clickable
+                is_visible = await detail_link.is_visible()
+                if not is_visible:
+                    self.logger.warning("Link is not visible, scrolling to it")
+                    await detail_link.scroll_into_view_if_needed()
+                    await asyncio.sleep(0.5)
+                
+                # Try clicking the link (first attempt - single click)
                 await detail_link.click()
+                await asyncio.sleep(1)
+                
+                # Check if single click worked
+                new_url = await self.get_current_url()
+                if 'RealNoticeView' in new_url:
+                    self.logger.info("Successfully navigated to detail page (single click)")
+                    await self.delay()
+                    return True
+                
+                # If single click didn't work, try double click
+                self.logger.debug("Single click failed, trying double click")
+                await detail_link.dblclick()
                 await self.page.wait_for_load_state('networkidle')
                 await self.delay()
-                return True
+                
+                # Verify we actually navigated to the detail page
+                final_url = await self.get_current_url()
+                if 'RealNoticeView' in final_url:
+                    self.logger.info("Successfully navigated to detail page (double click)")
+                    return True
+                else:
+                    self.logger.warning(f"Both click attempts failed, still on list page: {final_url}")
+                    return False
+                    
             else:
-                self.logger.warning(f"Detail link not found: {notice_link_href}")
+                self.logger.warning(f"Detail link not found with any selector: {notice_link_href}")
+                # Debug: Log all available detail links
+                all_links = await self.page.query_selector_all('a[href*="RealNoticeView"]')
+                self.logger.debug(f"Found {len(all_links)} total detail links on page")
+                
+                if seq_id:
+                    # Try to find any link containing the seq_id in text or nearby elements
+                    seq_links = await self.page.query_selector_all(f'a:has-text("{seq_id}")')
+                    self.logger.debug(f"Found {len(seq_links)} links containing seq_id in text")
+                
                 return False
                 
         except Exception as e:
@@ -198,10 +311,42 @@ class BrowserController:
         """Go back to the list page"""
         try:
             self.logger.info("Going back to list page")
-            await self.page.go_back()
-            await self.page.wait_for_load_state('networkidle')
-            await self.delay()
-            return True
+            
+            # Try going back first
+            try:
+                await self.page.go_back()
+                await self.page.wait_for_load_state('networkidle', timeout=10000)
+                await self.delay()
+            except Exception as back_error:
+                self.logger.warning(f"Failed to go back, trying direct navigation: {back_error}")
+                # Fallback: Navigate directly to the list page
+                current_url = await self.get_current_url()
+                if 'RealNoticeView' in current_url:
+                    # Extract page info from current URL and navigate back to list
+                    await self.navigate_to_url(BASE_URL)
+                    await asyncio.sleep(2)
+            
+            # Wait for JavaScript and page state to stabilize
+            await asyncio.sleep(1)
+            
+            # Verify we're back on the list page and page elements are loaded
+            for attempt in range(3):
+                try:
+                    # Check if the main table is loaded
+                    table = await self.page.query_selector('table.tableHor')
+                    if table:
+                        self.logger.debug("Successfully returned to list page")
+                        return True
+                    else:
+                        self.logger.debug(f"Table not found on attempt {attempt + 1}, waiting...")
+                        await asyncio.sleep(1)
+                except Exception as e:
+                    self.logger.debug(f"Error checking table on attempt {attempt + 1}: {e}")
+                    await asyncio.sleep(1)
+            
+            self.logger.warning("Returned to list page but table verification failed")
+            return True  # Still return True as we went back successfully
+            
         except Exception as e:
             self.logger.error(f"Failed to go back to list page: {e}")
             return False

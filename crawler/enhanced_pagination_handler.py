@@ -137,8 +137,19 @@ class EnhancedPaginationHandler:
                 processed_notices = []
                 all_attachments = []
                 
-                for notice in notices:
+                for i, notice in enumerate(notices):
                     try:
+                        # Re-extract page content before each detail navigation to get fresh DOM state
+                        if i > 0:  # Skip for first notice as we already have fresh content
+                            await asyncio.sleep(0.5)  # Small delay for page stability
+                            fresh_content = await self.browser.get_page_content()
+                            if fresh_content:
+                                # Re-extract all notices to get current DOM links
+                                fresh_notices = self.extractor.extract_auction_data(fresh_content, page_num)
+                                if fresh_notices and i < len(fresh_notices):
+                                    # Update the current notice with fresh link data
+                                    notice['links'] = fresh_notices[i]['links']
+                        
                         # Process detail page if links are available
                         detail_result = await self._process_notice_details(
                             notice, 

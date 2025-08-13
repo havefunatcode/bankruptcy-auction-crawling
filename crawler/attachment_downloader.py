@@ -88,19 +88,45 @@ class AttachmentDownloader:
         
         try:
             # Method 1: Look for JavaScript download functions
-            # Pattern: download('file_id', 'display_name')
+            # Pattern: javascript:download('file_id', 'display_name')
+            # Example: <a href="javascript:download('1754983282331_162122.pdf','부산회생법원 2024하단616 부동산매각공고문.pdf')">
             js_download_links = await page.query_selector_all('a[href*="javascript:download"]')
             
-            for link in js_download_links:
+            self.logger.debug(f"Found {len(js_download_links)} JavaScript download links")
+            
+            for i, link in enumerate(js_download_links):
                 href = await link.get_attribute('href')
                 text = await link.text_content()
                 
+                self.logger.debug(f"Processing JS link {i+1}: href='{href}', text='{text}'")
+                
                 if href and 'download' in href:
-                    # Extract file information from JavaScript call
-                    match = re.search(r"download\s*\(\s*['\"]([^'\"]+)['\"]?\s*,\s*['\"]([^'\"]+)['\"]?\s*\)", href)
+                    # Enhanced regex to handle URL-encoded characters and various quote patterns
+                    patterns = [
+                        r"download\s*\(\s*['\"]([^'\"]+)['\"]?\s*,\s*['\"]([^'\"]+)['\"]?\s*\)",  # Standard pattern
+                        r"download\s*\(\s*['\"]([^'\"]+)['\"]?\s*,\s*['\"]([^'\"]*%[^'\"]*)['\"]?\s*\)",  # URL-encoded pattern
+                        r"download\s*\(\s*['\"]([^'\"]+)['\"]?\s*,\s*['\"]([^'\"]*부동산매각공고문[^'\"]*)['\"]?\s*\)"  # Specific pattern
+                    ]
+                    
+                    match = None
+                    for pattern in patterns:
+                        match = re.search(pattern, href)
+                        if match:
+                            break
+                    
                     if match:
                         file_id = match.group(1)
                         display_name = match.group(2)
+                        
+                        # URL decode the display name if needed
+                        import urllib.parse
+                        if '%' in display_name:
+                            try:
+                                display_name = urllib.parse.unquote(display_name)
+                            except:
+                                pass  # Keep original if decoding fails
+                        
+                        self.logger.info(f"Found attachment: {display_name} (ID: {file_id})")
                         
                         attachment_links.append({
                             'type': 'javascript_download',
@@ -109,6 +135,8 @@ class AttachmentDownloader:
                             'link_text': text.strip(),
                             'href': href
                         })
+                    else:
+                        self.logger.warning(f"Failed to parse download function: {href}")
                         
             # Method 2: Look for direct file links
             direct_file_links = await page.query_selector_all('a[href*=".pdf"], a[href*=".doc"], a[href*=".hwp"], a[href*=".zip"], a[href*=".xlsx"], a[href*=".xls"]')
@@ -189,27 +217,59 @@ class AttachmentDownloader:
                     
             file_path = notice_dir / f"{index:02d}_{safe_filename}"
             
-            # Set up download handling
-            async with page.expect_download() as download_info:
-                # Execute the download JavaScript
-                await page.evaluate(f"download('{file_id}', '{display_name}')")
+            # Set up download handling with timeout and proper error handling
+            try:
+                async with page.expect_download(timeout=15000) as download_info:
+                    # Execute the download JavaScript with proper escaping
+                    escaped_file_id = file_id.replace("'", "\\'").replace('"', '\\"')
+                    escaped_display_name = display_name.replace("'", "\\'").replace('"', '\\"')
+                    await page.evaluate(f"download('{escaped_file_id}', '{escaped_display_name}')")
+                    
+                download = await download_info.value
                 
-            download = await download_info.value
-            
-            # Save the file
-            await download.save_as(file_path)
-            
-            # Get file stats
-            file_size = file_path.stat().st_size if file_path.exists() else 0
-            
-            return {
-                'filename': file_path.name,
-                'display_name': display_name,
-                'file_path': str(file_path),
-                'file_size': file_size,
-                'download_method': 'javascript',
-                'file_id': file_id
-            }
+                # Save the file
+                await download.save_as(file_path)
+                
+                # Get file stats
+                file_size = file_path.stat().st_size if file_path.exists() else 0
+                
+                return {
+                    'filename': file_path.name,
+                    'display_name': display_name,
+                    'file_path': str(file_path),
+                    'file_size': file_size,
+                    'download_method': 'javascript',
+                    'file_id': file_id
+                }
+                
+            except Exception as download_error:
+                self.logger.warning(f"JavaScript download failed, trying alternative method: {download_error}")
+                
+                # Alternative: Try clicking the link directly
+                try:
+                    link_selector = f'a[href*="download(\'{file_id}\'"]'
+                    link = await page.query_selector(link_selector)
+                    if link:
+                        async with page.expect_download(timeout=10000) as download_info:
+                            await link.click()
+                        
+                        download = await download_info.value
+                        await download.save_as(file_path)
+                        
+                        file_size = file_path.stat().st_size if file_path.exists() else 0
+                        
+                        return {
+                            'filename': file_path.name,
+                            'display_name': display_name,
+                            'file_path': str(file_path),
+                            'file_size': file_size,
+                            'download_method': 'click',
+                            'file_id': file_id
+                        }
+                except Exception as click_error:
+                    self.logger.warning(f"Click download also failed: {click_error}")
+                    
+                return None
             
         except Exception as e:
             self.logger.error(f"Error downloading JavaScript file: {e}")
