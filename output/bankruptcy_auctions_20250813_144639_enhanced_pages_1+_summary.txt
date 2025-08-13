@@ -1,0 +1,40 @@
+Bankruptcy Auction Crawl Summary
+Generated: 2025-08-13 14:46:39
+==================================================
+
+Total Items: 10
+Pages Crawled: 1
+Average Items per Page: 10.00
+
+Field Statistics:
+Field                     Total    Non-Empty    Fill Rate 
+-------------------------------------------------------
+page_number               10       10           100.0     %
+row_number                10       10           100.0     %
+extraction_date           10       10           100.0     %
+sequence_number           10       10           100.0     %
+jurisdiction              10       10           100.0     %
+bankruptcy_trustee        10       10           100.0     %
+notice_title              10       10           100.0     %
+view_count                10       10           100.0     %
+links                     10       10           100.0     %
+detail_url                3        3            100.0     %
+notice_content            3        3            100.0     %
+notice_date               3        2            66.7      %
+jurisdiction_full         3        3            100.0     %
+case_details              3        3            100.0     %
+attachment_links          3        2            66.7      %
+contact_info              3        3            100.0     %
+deadline_info             3        0            0.0       %
+additional_info           3        3            100.0     %
+attachment_count          3        2            66.7      %
+attachment_download_errors 3        0            0.0       %
+attachments_dir           3        3            100.0     %
+detail_processing_failed  7        7            100.0     %
+
+Jurisdiction Distribution:
+Jurisdiction                   Count    Percentage
+------------------------------------------------
+서울회생법원                         6        60.0      %
+대전지방법원                         2        20.0      %
+수원회생법원                         2        20.0      %

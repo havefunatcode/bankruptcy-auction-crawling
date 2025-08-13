@@ -166,3 +166,50 @@ class BrowserController:
         except Exception as e:
             self.logger.error(f"Failed to get current page number: {e}")
             return 1
+            
+    async def navigate_to_detail_page(self, notice_link_href: str) -> bool:
+        """Navigate to a specific notice detail page"""
+        try:
+            self.logger.info(f"Navigating to detail page")
+            
+            # Find the link with matching href
+            link_selector = f'a[href="{notice_link_href}"]'
+            detail_link = await self.page.query_selector(link_selector)
+            
+            if detail_link:
+                # Get link text for logging
+                link_text = await detail_link.text_content()
+                self.logger.info(f"Clicking detail link: '{link_text.strip()}'")
+                
+                # Click the link
+                await detail_link.click()
+                await self.page.wait_for_load_state('networkidle')
+                await self.delay()
+                return True
+            else:
+                self.logger.warning(f"Detail link not found: {notice_link_href}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Failed to navigate to detail page: {e}")
+            return False
+            
+    async def go_back_to_list(self) -> bool:
+        """Go back to the list page"""
+        try:
+            self.logger.info("Going back to list page")
+            await self.page.go_back()
+            await self.page.wait_for_load_state('networkidle')
+            await self.delay()
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to go back to list page: {e}")
+            return False
+            
+    async def get_current_url(self) -> str:
+        """Get current page URL"""
+        try:
+            return self.page.url
+        except Exception as e:
+            self.logger.error(f"Failed to get current URL: {e}")
+            return ""

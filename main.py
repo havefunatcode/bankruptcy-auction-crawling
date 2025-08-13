@@ -7,11 +7,14 @@ import sys
 from datetime import datetime
 from crawler.browser_controller import BrowserController
 from crawler.data_extractor import DataExtractor
+from crawler.detail_extractor import DetailExtractor
 from crawler.pagination_handler import PaginationHandler
+from crawler.enhanced_pagination_handler import EnhancedPaginationHandler
 from crawler.data_storage import DataStorage
+from crawler.attachment_downloader import AttachmentDownloader
 from utils.logger import setup_logger
 from utils.error_handler import error_handler, RateLimiter
-from config import BASE_URL, DELAY_BETWEEN_REQUESTS
+from config import BASE_URL, DELAY_BETWEEN_REQUESTS, DOWNLOAD_ATTACHMENTS, DOWNLOADS_DIR
 
 
 class BankruptcyAuctionCrawler:
@@ -21,7 +24,9 @@ class BankruptcyAuctionCrawler:
         self.logger = setup_logger(__name__)
         self.browser = None
         self.extractor = DataExtractor()
+        self.detail_extractor = DetailExtractor()
         self.storage = DataStorage()
+        self.attachment_downloader = AttachmentDownloader(DOWNLOADS_DIR) if DOWNLOAD_ATTACHMENTS else None
         self.rate_limiter = RateLimiter(1.0 / DELAY_BETWEEN_REQUESTS)
         
     async def __aenter__(self):
@@ -29,6 +34,12 @@ class BankruptcyAuctionCrawler:
         self.browser = BrowserController()
         await self.browser.start()
         self.pagination_handler = PaginationHandler(self.browser, self.extractor)
+        self.enhanced_pagination_handler = EnhancedPaginationHandler(
+            self.browser, 
+            self.extractor, 
+            self.detail_extractor,
+            self.attachment_downloader
+        )
         return self
         
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -166,6 +177,81 @@ class BankruptcyAuctionCrawler:
                 'success': False,
                 'error': str(e)
             }
+            
+    async def crawl_with_attachments(self, 
+                                   start_page: int = 1, 
+                                   max_pages: int = None,
+                                   download_attachments: bool = True) -> dict:
+        """Enhanced crawling with detail page processing and attachment downloads"""
+        
+        start_time = datetime.now()
+        self.logger.info(f"Starting enhanced crawl with attachments from page {start_page}")
+        
+        try:
+            # Navigate to base URL
+            success = await self.browser.navigate_to_url(BASE_URL)
+            if not success:
+                raise Exception("Failed to navigate to base URL")
+                
+            # Enhanced crawl with details and attachments
+            crawl_result = await self.enhanced_pagination_handler.crawl_all_pages_with_details(
+                start_page=start_page,
+                max_pages=max_pages,
+                download_attachments=download_attachments
+            )
+            
+            all_data = crawl_result['notices']
+            all_attachments = crawl_result['attachments']
+            crawl_summary = crawl_result['summary']
+            
+            # Save data
+            saved_files = {}
+            if all_data:
+                saved_files = self.storage.save_data(all_data, f"enhanced_pages_{start_page}+")
+                
+            # Save attachment summary
+            if all_attachments and self.attachment_downloader:
+                attachment_summary = self.attachment_downloader.get_download_summary(all_attachments)
+                
+                # Save attachment summary to file
+                import json
+                import os
+                summary_file = os.path.join(self.storage.output_dir, f"attachment_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+                with open(summary_file, 'w', encoding='utf-8') as f:
+                    json.dump(attachment_summary, f, ensure_ascii=False, indent=2)
+                saved_files['attachment_summary'] = summary_file
+                
+            # Calculate statistics
+            end_time = datetime.now()
+            duration = end_time - start_time
+            
+            results = {
+                'success': True,
+                'mode': 'enhanced_with_attachments',
+                'total_notices': len(all_data),
+                'start_page': start_page,
+                'max_pages': max_pages,
+                'duration_seconds': duration.total_seconds(),
+                'notices_per_second': len(all_data) / duration.total_seconds() if duration.total_seconds() > 0 else 0,
+                'crawl_summary': crawl_summary,
+                'saved_files': saved_files,
+                'error_statistics': error_handler.get_error_statistics()
+            }
+            
+            self.logger.info(f"Enhanced crawl completed: {len(all_data)} notices in {duration}")
+            if download_attachments:
+                self.logger.info(f"Downloaded attachments for {crawl_summary.get('notices_with_attachments', 0)} notices")
+                
+            return results
+            
+        except Exception as e:
+            self.logger.error(f"Enhanced crawl failed: {e}")
+            return {
+                'success': False,
+                'mode': 'enhanced_with_attachments',
+                'error': str(e),
+                'error_statistics': error_handler.get_error_statistics()
+            }
 
 
 async def main():
@@ -177,6 +263,8 @@ async def main():
     parser.add_argument('--preview', action='store_true', help='Preview mode - check data availability')
     parser.add_argument('--pages', nargs='+', type=int, help='Specific page numbers to crawl')
     parser.add_argument('--headless', action='store_false', default=True, help='Run browser in visible mode (default: headless)')
+    parser.add_argument('--with-attachments', action='store_true', help='Download attachments from detail pages')
+    parser.add_argument('--no-attachments', action='store_true', help='Disable attachment downloads (faster crawling)')
     
     args = parser.parse_args()
     
@@ -185,11 +273,25 @@ async def main():
         import config
         config.HEADLESS = False
         
+    # Determine attachment download mode
+    download_attachments = DOWNLOAD_ATTACHMENTS  # Default from config
+    if args.with_attachments:
+        download_attachments = True
+    elif args.no_attachments:
+        download_attachments = False
+        
     try:
         async with BankruptcyAuctionCrawler() as crawler:
             if args.pages:
                 # Crawl specific pages
                 result = await crawler.crawl_specific_pages(args.pages)
+            elif download_attachments:
+                # Enhanced crawl with attachments
+                result = await crawler.crawl_with_attachments(
+                    start_page=args.start_page,
+                    max_pages=args.max_pages,
+                    download_attachments=download_attachments
+                )
             else:
                 # Regular crawl
                 result = await crawler.crawl(
@@ -215,7 +317,27 @@ async def main():
                         for page in page_info['sampled_pages']:
                             status = "✓" if page['has_data'] else "✗"
                             print(f"    Page {page['page_number']}: {status} ({page['item_count']} items)")
+                elif result.get('mode') == 'enhanced_with_attachments':
+                    # Enhanced mode results
+                    print(f"Enhanced Crawl Results:")
+                    print(f"Total Notices Crawled: {result.get('total_notices', 0)}")
+                    print(f"Duration: {result.get('duration_seconds', 0):.1f} seconds")
+                    print(f"Rate: {result.get('notices_per_second', 0):.2f} notices/second")
+                    
+                    crawl_summary = result.get('crawl_summary', {})
+                    if crawl_summary:
+                        print(f"Notices with Attachments: {crawl_summary.get('notices_with_attachments', 0)}")
+                        print(f"Total Attachments Downloaded: {crawl_summary.get('total_attachments_downloaded', 0)}")
+                        if crawl_summary.get('total_size_mb'):
+                            print(f"Total Downloaded Size: {crawl_summary.get('total_size_mb', 0):.2f} MB")
+                    
+                    saved_files = result.get('saved_files', {})
+                    if saved_files:
+                        print(f"Saved Files:")
+                        for file_type, file_path in saved_files.items():
+                            print(f"  {file_type.upper()}: {file_path}")
                 else:
+                    # Regular mode results
                     print(f"Total Items Crawled: {result.get('total_items', 0)}")
                     print(f"Duration: {result.get('duration_seconds', 0):.1f} seconds")
                     print(f"Rate: {result.get('items_per_second', 0):.2f} items/second")

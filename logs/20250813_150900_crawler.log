@@ -1,0 +1,71 @@
+2025-08-13 15:09:00,111 - crawler.browser_controller - INFO - Starting browser...
+2025-08-13 15:09:00,391 - crawler.browser_controller - INFO - Browser started successfully
+2025-08-13 15:09:00,391 - __main__ - INFO - Starting enhanced crawl with attachments from page 1
+2025-08-13 15:09:00,391 - crawler.browser_controller - INFO - Navigating to: https://www.scourt.go.kr/portal/notice/realestate/RealNoticeList.work
+2025-08-13 15:09:03,695 - crawler.enhanced_pagination_handler - INFO - Starting enhanced crawl from page 1
+2025-08-13 15:09:03,696 - crawler.enhanced_pagination_handler - INFO - Attachment downloading is enabled
+2025-08-13 15:09:03,696 - crawler.browser_controller - INFO - Navigating to page 1
+2025-08-13 15:09:06,477 - crawler.data_extractor - INFO - Extracted 10 auction items from page 1
+2025-08-13 15:09:06,477 - crawler.browser_controller - INFO - Navigating to detail page
+2025-08-13 15:09:06,481 - crawler.browser_controller - INFO - Clicking detail link: '파산재단 재고자산 일괄매각 공고'
+2025-08-13 15:09:08,611 - crawler.detail_extractor - INFO - Extracted detail data for notice 405
+2025-08-13 15:09:08,618 - crawler.attachment_downloader - INFO - No attachments found for notice 405
+2025-08-13 15:09:08,619 - crawler.browser_controller - INFO - Going back to list page
+2025-08-13 15:09:11,126 - crawler.browser_controller - INFO - Navigating to detail page
+2025-08-13 15:09:11,139 - crawler.browser_controller - WARNING - Detail link not found: /portal/notice/realestate/RealNoticeView.work?pageIndex=1&bub_cd=&searchWord=&searchOption=&seq_id=29886
+2025-08-13 15:09:11,139 - crawler.enhanced_pagination_handler - WARNING - Failed to navigate to detail page for notice 404
+2025-08-13 15:09:11,139 - crawler.browser_controller - INFO - Navigating to detail page
+2025-08-13 15:09:11,140 - crawler.browser_controller - WARNING - Detail link not found: /portal/notice/realestate/RealNoticeView.work?pageIndex=1&bub_cd=&searchWord=&searchOption=&seq_id=29885
+2025-08-13 15:09:11,140 - crawler.enhanced_pagination_handler - WARNING - Failed to navigate to detail page for notice 403
+2025-08-13 15:09:11,140 - crawler.browser_controller - INFO - Navigating to detail page
+2025-08-13 15:09:11,141 - crawler.browser_controller - WARNING - Detail link not found: /portal/notice/realestate/RealNoticeView.work?pageIndex=1&bub_cd=&searchWord=&searchOption=&seq_id=29884
+2025-08-13 15:09:11,141 - crawler.enhanced_pagination_handler - WARNING - Failed to navigate to detail page for notice 402
+2025-08-13 15:09:11,141 - crawler.browser_controller - INFO - Navigating to detail page
+2025-08-13 15:09:11,142 - crawler.browser_controller - WARNING - Detail link not found: /portal/notice/realestate/RealNoticeView.work?pageIndex=1&bub_cd=&searchWord=&searchOption=&seq_id=29883
+2025-08-13 15:09:11,142 - crawler.enhanced_pagination_handler - WARNING - Failed to navigate to detail page for notice 401
+2025-08-13 15:09:11,142 - crawler.browser_controller - INFO - Navigating to detail page
+2025-08-13 15:09:11,143 - crawler.browser_controller - WARNING - Detail link not found: /portal/notice/realestate/RealNoticeView.work?pageIndex=1&bub_cd=&searchWord=&searchOption=&seq_id=29882
+2025-08-13 15:09:11,143 - crawler.enhanced_pagination_handler - WARNING - Failed to navigate to detail page for notice 400
+2025-08-13 15:09:11,143 - crawler.browser_controller - INFO - Navigating to detail page
+2025-08-13 15:09:11,144 - crawler.browser_controller - WARNING - Detail link not found: /portal/notice/realestate/RealNoticeView.work?pageIndex=1&bub_cd=&searchWord=&searchOption=&seq_id=29881
+2025-08-13 15:09:11,145 - crawler.enhanced_pagination_handler - WARNING - Failed to navigate to detail page for notice 399
+2025-08-13 15:09:11,145 - crawler.browser_controller - INFO - Navigating to detail page
+2025-08-13 15:09:11,145 - crawler.browser_controller - WARNING - Detail link not found: /portal/notice/realestate/RealNoticeView.work?pageIndex=1&bub_cd=&searchWord=&searchOption=&seq_id=29880
+2025-08-13 15:09:11,145 - crawler.enhanced_pagination_handler - WARNING - Failed to navigate to detail page for notice 398
+2025-08-13 15:09:11,146 - crawler.browser_controller - INFO - Navigating to detail page
+2025-08-13 15:09:11,146 - crawler.browser_controller - WARNING - Detail link not found: /portal/notice/realestate/RealNoticeView.work?pageIndex=1&bub_cd=&searchWord=&searchOption=&seq_id=29879
+2025-08-13 15:09:11,146 - crawler.enhanced_pagination_handler - WARNING - Failed to navigate to detail page for notice 397
+2025-08-13 15:09:11,146 - crawler.browser_controller - INFO - Navigating to detail page
+2025-08-13 15:09:11,148 - crawler.browser_controller - WARNING - Detail link not found: /portal/notice/realestate/RealNoticeView.work?pageIndex=1&bub_cd=&searchWord=&searchOption=&seq_id=29878
+2025-08-13 15:09:11,148 - crawler.enhanced_pagination_handler - WARNING - Failed to navigate to detail page for notice 396
+2025-08-13 15:09:11,148 - crawler.enhanced_pagination_handler - INFO - Processed 10 notices on page 1
+2025-08-13 15:09:12,149 - crawler.browser_controller - INFO - Navigating to page 2
+2025-08-13 15:09:12,161 - crawler.browser_controller - ERROR - Failed to navigate to page 2: Page.evaluate: TypeError: Cannot read properties of undefined (reading 'pageIndex')
+    at eval (eval at evaluate (:291:30), <anonymous>:1:14)
+    at eval (<anonymous>)
+    at UtilityScript.evaluate (<anonymous>:291:30)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+2025-08-13 15:09:12,161 - crawler.enhanced_pagination_handler - WARNING - Failed to navigate to page 2 on attempt 1
+2025-08-13 15:09:17,162 - crawler.browser_controller - INFO - Navigating to page 2
+2025-08-13 15:09:17,173 - crawler.browser_controller - ERROR - Failed to navigate to page 2: Page.evaluate: TypeError: Cannot read properties of undefined (reading 'pageIndex')
+    at eval (eval at evaluate (:291:30), <anonymous>:1:14)
+    at eval (<anonymous>)
+    at UtilityScript.evaluate (<anonymous>:291:30)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+2025-08-13 15:09:17,173 - crawler.enhanced_pagination_handler - WARNING - Failed to navigate to page 2 on attempt 2
+2025-08-13 15:09:22,175 - crawler.browser_controller - INFO - Navigating to page 2
+2025-08-13 15:09:22,181 - crawler.browser_controller - ERROR - Failed to navigate to page 2: Page.evaluate: TypeError: Cannot read properties of undefined (reading 'pageIndex')
+    at eval (eval at evaluate (:291:30), <anonymous>:1:14)
+    at eval (<anonymous>)
+    at UtilityScript.evaluate (<anonymous>:291:30)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+2025-08-13 15:09:22,181 - crawler.enhanced_pagination_handler - WARNING - Failed to navigate to page 2 on attempt 3
+2025-08-13 15:09:22,181 - crawler.enhanced_pagination_handler - ERROR - Failed to load page 2
+2025-08-13 15:09:23,183 - crawler.enhanced_pagination_handler - INFO - Reached maximum pages limit (2)
+2025-08-13 15:09:23,183 - crawler.enhanced_pagination_handler - INFO - Enhanced crawling completed: {'total_notices': 10, 'total_pages_crawled': 2, 'notices_with_attachments': 0, 'total_attachments_downloaded': 0, 'attachment_download_enabled': True, 'total_notices_processed': 1, 'total_download_errors': 0, 'total_size_bytes': 0, 'total_size_mb': 0.0, 'notices_without_attachments': 1}
+2025-08-13 15:09:23,190 - crawler.data_storage - INFO - Saved CSV file: output/bankruptcy_auctions_20250813_150923_enhanced_pages_1+.csv
+2025-08-13 15:09:23,191 - crawler.data_storage - INFO - Saved summary file: output/bankruptcy_auctions_20250813_150923_enhanced_pages_1+_summary.txt
+2025-08-13 15:09:23,191 - crawler.data_storage - INFO - Successfully saved 10 records to 2 files
+2025-08-13 15:09:23,191 - __main__ - INFO - Enhanced crawl completed: 10 notices in 0:00:22.800251
+2025-08-13 15:09:23,191 - __main__ - INFO - Downloaded attachments for 0 notices
+2025-08-13 15:09:23,225 - crawler.browser_controller - INFO - Browser closed successfully

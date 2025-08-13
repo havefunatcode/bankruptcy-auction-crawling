@@ -20,6 +20,12 @@ OUTPUT_DIR = "output"
 OUTPUT_FORMAT = "csv"  # csv, json, both
 OUTPUT_FILENAME = "bankruptcy_auctions"
 
+# Attachment Download Configuration
+DOWNLOAD_ATTACHMENTS = True
+DOWNLOADS_DIR = "downloads"
+MAX_ATTACHMENT_SIZE_MB = 100  # Maximum file size to download
+ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.hwp', '.zip', '.xlsx', '.xls', '.txt']
+
 # Logging Configuration
 LOG_LEVEL = "INFO"
 LOG_FILE = "crawler.log"
