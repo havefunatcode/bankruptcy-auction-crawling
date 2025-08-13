@@ -1,0 +1,10 @@
+2025-08-13 14:32:14,816 - crawler.browser_controller - INFO - Starting browser...
+2025-08-13 14:32:15,086 - crawler.browser_controller - INFO - Browser started successfully
+2025-08-13 14:32:15,087 - __main__ - INFO - Starting bankruptcy auction crawl from page 1
+2025-08-13 14:32:15,087 - crawler.browser_controller - INFO - Navigating to: https://www.scourt.go.kr/portal/notice/realestate/RealNoticeList.work
+2025-08-13 14:32:18,475 - __main__ - INFO - Running preview mode...
+2025-08-13 14:32:18,475 - crawler.browser_controller - INFO - Navigating to page 1
+2025-08-13 14:32:18,507 - crawler.browser_controller - WARNING - Could not find navigation elements for page 1
+2025-08-13 14:32:18,507 - crawler.browser_controller - INFO - Navigating to page 1
+2025-08-13 14:32:18,510 - crawler.browser_controller - WARNING - Could not find navigation elements for page 1
+2025-08-13 14:32:18,533 - crawler.browser_controller - INFO - Browser closed successfully

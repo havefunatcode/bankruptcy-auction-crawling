@@ -1,0 +1,25 @@
+2025-08-13 14:33:38,417 - crawler.browser_controller - INFO - Starting browser...
+2025-08-13 14:33:38,686 - crawler.browser_controller - INFO - Browser started successfully
+2025-08-13 14:33:38,687 - __main__ - INFO - Starting bankruptcy auction crawl from page 1
+2025-08-13 14:33:38,687 - crawler.browser_controller - INFO - Navigating to: https://www.scourt.go.kr/portal/notice/realestate/RealNoticeList.work
+2025-08-13 14:33:42,071 - __main__ - INFO - Running preview mode...
+2025-08-13 14:33:42,072 - crawler.browser_controller - INFO - Navigating to page 1
+2025-08-13 14:33:44,856 - crawler.data_extractor - INFO - Extracted 10 auction items from page 1
+2025-08-13 14:33:44,856 - crawler.browser_controller - INFO - Navigating to page 2
+2025-08-13 14:33:47,667 - crawler.data_extractor - INFO - Extracted 10 auction items from page 2
+2025-08-13 14:33:47,667 - crawler.browser_controller - INFO - Navigating to page 3
+2025-08-13 14:33:50,450 - crawler.data_extractor - INFO - Extracted 10 auction items from page 3
+2025-08-13 14:33:50,450 - crawler.pagination_handler - INFO - Attempting to find last page with data
+2025-08-13 14:33:50,450 - crawler.browser_controller - INFO - Navigating to page 1
+2025-08-13 14:33:53,175 - crawler.browser_controller - INFO - Navigating to page 11
+2025-08-13 14:33:55,209 - crawler.browser_controller - INFO - Navigating to page 12
+2025-08-13 14:33:57,963 - crawler.browser_controller - INFO - Navigating to page 13
+2025-08-13 14:34:00,760 - crawler.browser_controller - INFO - Navigating to page 14
+2025-08-13 14:34:03,541 - crawler.browser_controller - INFO - Navigating to page 15
+2025-08-13 14:34:06,330 - crawler.browser_controller - INFO - Navigating to page 16
+2025-08-13 14:34:09,090 - crawler.browser_controller - INFO - Navigating to page 17
+2025-08-13 14:34:11,879 - crawler.browser_controller - INFO - Navigating to page 18
+2025-08-13 14:34:14,654 - crawler.browser_controller - INFO - Navigating to page 19
+2025-08-13 14:34:17,454 - crawler.browser_controller - INFO - Navigating to page 20
+2025-08-13 14:34:20,232 - crawler.pagination_handler - INFO - Last page with data appears to be: 20
+2025-08-13 14:34:20,254 - crawler.browser_controller - INFO - Browser closed successfully
