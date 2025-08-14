@@ -1,0 +1,10 @@
+# Core PDF processing dependencies only (Python 3.13 compatible)
+PyMuPDF>=1.23.0
+psycopg2-binary>=2.9.0
+Pillow>=10.0.0
+
+# Core dependencies for crawler (if needed)
+beautifulsoup4
+requests
+aiofiles
+python-dateutil

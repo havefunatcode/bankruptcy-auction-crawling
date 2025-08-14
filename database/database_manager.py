@@ -269,7 +269,7 @@ class DatabaseManager:
                            ptc.text_content, ptc.bbox_x0, ptc.bbox_y0, ptc.bbox_x1, ptc.bbox_y1
                     FROM pdf_text_content ptc
                     JOIN pdf_documents pd ON ptc.document_id = pd.id
-                    WHERE to_tsvector('korean', ptc.text_content) @@ plainto_tsquery('korean', %s)
+                    WHERE to_tsvector('simple', ptc.text_content) @@ plainto_tsquery('simple', %s)
                     ORDER BY pd.processed_at DESC
                     LIMIT %s;
                     """

@@ -1,6 +1,5 @@
 playwright==1.40.0
 beautifulsoup4==4.12.2
-pandas==2.1.4
 requests==2.31.0
 lxml==4.9.3
 aiofiles==23.2.1
@@ -10,3 +9,6 @@ python-dateutil==2.8.2
 PyMuPDF>=1.23.0
 psycopg2-binary>=2.9.0
 Pillow>=10.0.0
+
+# Optional: pandas for data analysis (Python 3.13 compatible version)
+pandas>=2.2.0

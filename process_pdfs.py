@@ -22,7 +22,7 @@ def main():
     parser.add_argument('--init-db', action='store_true', help='Initialize database schema only')
     parser.add_argument('--search', help='Search PDF content in database')
     parser.add_argument('--summary', action='store_true', help='Show processing summary from database')
-    parser.add_argument('--async', action='store_true', help='Use async processing for better performance')
+    parser.add_argument('--async-mode', action='store_true', help='Use async processing for better performance')
     parser.add_argument('--concurrent', type=int, default=3, help='Number of concurrent async tasks')
     
     args = parser.parse_args()
@@ -115,7 +115,7 @@ def main():
         if args.notice_id:
             print(f"Processing PDFs for notice ID: {args.notice_id}")
             stats = processor.process_specific_notice(args.notice_id)
-        elif args.async:
+        elif args.async_mode:
             print(f"Processing all PDFs asynchronously (max {args.concurrent} concurrent)")
             stats = asyncio.run(processor.process_all_pdfs_async(
                 max_concurrent=args.concurrent,

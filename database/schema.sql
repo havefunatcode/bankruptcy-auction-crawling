@@ -76,8 +76,8 @@ CREATE INDEX IF NOT EXISTS idx_pdf_text_document_page ON pdf_text_content(docume
 CREATE INDEX IF NOT EXISTS idx_pdf_tables_document_page ON pdf_tables(document_id, page_number);
 CREATE INDEX IF NOT EXISTS idx_pdf_images_document_page ON pdf_images(document_id, page_number);
 
--- Full-text search index for text content
-CREATE INDEX IF NOT EXISTS idx_pdf_text_content_fts ON pdf_text_content USING gin(to_tsvector('korean', text_content));
+-- Full-text search index for text content (using simple configuration for compatibility)
+CREATE INDEX IF NOT EXISTS idx_pdf_text_content_fts ON pdf_text_content USING gin(to_tsvector('simple', text_content));
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -89,6 +89,7 @@ END;
 $$ language 'plpgsql';
 
 -- Trigger for updating updated_at on pdf_documents
+DROP TRIGGER IF EXISTS update_pdf_documents_updated_at ON pdf_documents;
 CREATE TRIGGER update_pdf_documents_updated_at 
     BEFORE UPDATE ON pdf_documents 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -107,6 +108,7 @@ COMMENT ON COLUMN pdf_text_content.bbox_y1 IS 'Top bounding box coordinate';
 COMMENT ON COLUMN pdf_tables.table_data IS 'JSON structure containing table rows and columns';
 
 -- Views for common queries
+DROP VIEW IF EXISTS pdf_processing_summary;
 CREATE OR REPLACE VIEW pdf_processing_summary AS
 SELECT 
     pd.notice_id,

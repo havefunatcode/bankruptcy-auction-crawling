@@ -57,8 +57,7 @@ DATABASE_CONFIG = {
     'database': db_config.database,
     'user': db_config.user,
     'password': db_config.password,
-    'connection_timeout': db_config.connection_timeout,
-    'command_timeout': db_config.command_timeout,
+    'connect_timeout': db_config.connection_timeout,
 }
 
 # Schema file path
