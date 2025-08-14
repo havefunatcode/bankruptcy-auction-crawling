@@ -55,6 +55,9 @@ output/
 # Downloads (scraped attachment files)
 downloads/
 
+# Extracted Images
+extracted_images/
+
 # Debug files
 debug_*.py
 debug_*.html
