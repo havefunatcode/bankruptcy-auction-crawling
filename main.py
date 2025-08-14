@@ -265,12 +265,14 @@ async def main():
     parser.add_argument('--headless', action='store_false', default=True, help='Run browser in visible mode (default: headless)')
     parser.add_argument('--with-attachments', action='store_true', help='Download attachments from detail pages')
     parser.add_argument('--no-attachments', action='store_true', help='Disable attachment downloads (faster crawling)')
+    parser.add_argument('--process-pdfs', action='store_true', help='Enable PDF processing and database storage')
+    parser.add_argument('--no-pdf-processing', action='store_true', help='Disable PDF processing')
     
     args = parser.parse_args()
     
     # Update config based on arguments
+    import config
     if not args.headless:
-        import config
         config.HEADLESS = False
         
     # Determine attachment download mode
@@ -279,6 +281,14 @@ async def main():
         download_attachments = True
     elif args.no_attachments:
         download_attachments = False
+        
+    # Determine PDF processing mode
+    if args.process_pdfs:
+        config.PROCESS_PDFS = True
+        config.PDF_PROCESSING_ENABLED = True
+    elif args.no_pdf_processing:
+        config.PROCESS_PDFS = False
+        config.PDF_PROCESSING_ENABLED = False
         
     try:
         async with BankruptcyAuctionCrawler() as crawler:
@@ -330,6 +340,18 @@ async def main():
                         print(f"Total Attachments Downloaded: {crawl_summary.get('total_attachments_downloaded', 0)}")
                         if crawl_summary.get('total_size_mb'):
                             print(f"Total Downloaded Size: {crawl_summary.get('total_size_mb', 0):.2f} MB")
+                        
+                        # PDF processing results
+                        pdf_stats = crawl_summary.get('pdf_processing')
+                        if pdf_stats:
+                            print(f"PDF Processing Results:")
+                            print(f"  Processed PDF Files: {pdf_stats.get('processed_files', 0)}")
+                            print(f"  Failed PDF Files: {pdf_stats.get('failed_files', 0)}")
+                            print(f"  Total Text Blocks: {pdf_stats.get('total_text_blocks', 0)}")
+                            print(f"  Total Tables: {pdf_stats.get('total_tables', 0)}")
+                            print(f"  Total Images: {pdf_stats.get('total_images', 0)}")
+                        elif crawl_summary.get('pdf_processing_error'):
+                            print(f"PDF Processing Error: {crawl_summary.get('pdf_processing_error')}")
                     
                     saved_files = result.get('saved_files', {})
                     if saved_files:
