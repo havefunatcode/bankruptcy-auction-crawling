@@ -9,6 +9,8 @@ from dataclasses import asdict
 from utils.logger import setup_logger
 from database.database_manager import DatabaseManager
 from .pdf_parser import PDFParser
+from .content_structurer import ContentStructurer, StructuringResult
+from .dynamic_section_processor import DynamicSectionProcessor, ProcessingResult
 
 
 class PDFProcessor:
@@ -23,6 +25,8 @@ class PDFProcessor:
         # Initialize components
         self.db_manager = DatabaseManager()
         self.pdf_parser = PDFParser(output_dir=extracted_images_dir)
+        self.content_structurer = ContentStructurer()
+        self.dynamic_processor = DynamicSectionProcessor()
         
         # Processing statistics
         self.stats = {
@@ -120,6 +124,20 @@ class PDFProcessor:
                 self.stats['total_text_blocks'] += len(parsed_data['text_blocks'])
                 self.stats['total_tables'] += len(parsed_data['tables'])
                 self.stats['total_images'] += len(parsed_data['images'])
+                
+                # Extract both structured content and dynamic sections
+                try:
+                    document_id = self._get_document_id(notice_id, file_name)
+                    if document_id:
+                        # Legacy structured content extraction
+                        self._extract_and_store_structured_content(document_id, notice_id, file_name, parsed_data)
+                        
+                        # New dynamic section processing
+                        self._extract_and_store_dynamic_sections(document_id, notice_id, file_name, parsed_data)
+                    else:
+                        self.logger.warning(f"Could not find document ID for content extraction: {file_name}")
+                except Exception as e:
+                    self.logger.error(f"Content extraction failed for {file_name}: {e}")
                 
                 self.logger.info(f"Successfully processed PDF: {file_name}")
             else:
@@ -378,3 +396,374 @@ class PDFProcessor:
                 pdf_path, 
                 notice_id
             )
+    
+    def _get_document_id(self, notice_id: str, file_name: str) -> Optional[int]:
+        """Get document ID from database"""
+        try:
+            doc = self.db_manager.get_document_by_notice_and_name(notice_id, file_name)
+            return doc['id'] if doc else None
+        except Exception as e:
+            self.logger.error(f"Error getting document ID for {file_name}: {e}")
+            return None
+    
+    def _extract_and_store_structured_content(self, document_id: int, notice_id: str, 
+                                            file_name: str, parsed_data: Dict[str, Any]):
+        """Extract structured content and store in database"""
+        try:
+            self.logger.info(f"Extracting structured content for {file_name}")
+            
+            # Prepare text blocks for structuring
+            text_blocks = [block.text for block in parsed_data['text_blocks']]
+            
+            # Prepare tables for structuring
+            tables = []
+            for table in parsed_data['tables']:
+                tables.append({
+                    'data': table.data,
+                    'page_number': table.page_number,
+                    'bbox': table.bbox
+                })
+            
+            # Extract structured content
+            result = self.content_structurer.structure_document(
+                notice_id, file_name, text_blocks, tables
+            )
+            
+            if result.success:
+                # Store structured content in database
+                success = self.db_manager.update_structured_content(
+                    document_id=document_id,
+                    structured_data=result.structured_data,
+                    status='completed'
+                )
+                
+                if success:
+                    self.logger.info(f"Stored structured content for {file_name} (confidence: {result.confidence_score:.2f})")
+                else:
+                    self.logger.error(f"Failed to store structured content for {file_name}")
+            else:
+                # Store error status
+                self.db_manager.update_structured_content(
+                    document_id=document_id,
+                    structured_data=None,
+                    status='failed',
+                    error_message=result.error_message
+                )
+                self.logger.error(f"Structured content extraction failed for {file_name}: {result.error_message}")
+                
+        except Exception as e:
+            # Store error status
+            self.db_manager.update_structured_content(
+                document_id=document_id,
+                structured_data=None,
+                status='failed',
+                error_message=str(e)
+            )
+            self.logger.error(f"Error extracting structured content for {file_name}: {e}")
+    
+    def process_structured_content_batch(self, limit: int = 10) -> Dict[str, Any]:
+        """Process structured content for documents that don't have it yet"""
+        self.logger.info("Starting batch structured content processing")
+        
+        # Get documents that need structured content extraction
+        documents = self.db_manager.get_documents_for_structuring(limit)
+        
+        if not documents:
+            self.logger.info("No documents need structured content processing")
+            return {
+                'processed_docs': 0,
+                'failed_docs': 0,
+                'message': 'No documents to process'
+            }
+        
+        processed_count = 0
+        failed_count = 0
+        
+        for doc in documents:
+            try:
+                self.logger.info(f"Processing structured content for document ID {doc['id']}: {doc['file_name']}")
+                
+                # Update status to processing
+                self.db_manager.update_structured_content(
+                    document_id=doc['id'],
+                    structured_data=None,
+                    status='processing'
+                )
+                
+                # Get text blocks for this document
+                text_blocks = self._get_text_blocks_for_document(doc['id'])
+                tables = self._get_tables_for_document(doc['id'])
+                
+                # Extract structured content
+                result = self.content_structurer.structure_document(
+                    doc['notice_id'], doc['file_name'], text_blocks, tables
+                )
+                
+                if result.success:
+                    success = self.db_manager.update_structured_content(
+                        document_id=doc['id'],
+                        structured_data=result.structured_data,
+                        status='completed'
+                    )
+                    
+                    if success:
+                        processed_count += 1
+                        self.logger.info(f"Successfully processed structured content for {doc['file_name']} (confidence: {result.confidence_score:.2f})")
+                    else:
+                        failed_count += 1
+                        self.logger.error(f"Failed to store structured content for {doc['file_name']}")
+                else:
+                    self.db_manager.update_structured_content(
+                        document_id=doc['id'],
+                        structured_data=None,
+                        status='failed',
+                        error_message=result.error_message
+                    )
+                    failed_count += 1
+                    self.logger.error(f"Structured extraction failed for {doc['file_name']}: {result.error_message}")
+                    
+            except Exception as e:
+                self.db_manager.update_structured_content(
+                    document_id=doc['id'],
+                    structured_data=None,
+                    status='failed',
+                    error_message=str(e)
+                )
+                failed_count += 1
+                self.logger.error(f"Error processing structured content for {doc['file_name']}: {e}")
+        
+        result = {
+            'processed_docs': processed_count,
+            'failed_docs': failed_count,
+            'total_docs': len(documents)
+        }
+        
+        self.logger.info(f"Batch structured content processing completed: {result}")
+        return result
+    
+    def _get_text_blocks_for_document(self, document_id: int) -> List[str]:
+        """Get text blocks for a document from database"""
+        try:
+            with self.db_manager.get_connection() as conn:
+                with conn.cursor() as cur:
+                    sql = """
+                    SELECT text_content FROM pdf_text_content 
+                    WHERE document_id = %s 
+                    ORDER BY page_number, bbox_y0 DESC, bbox_x0 ASC;
+                    """
+                    cur.execute(sql, (document_id,))
+                    rows = cur.fetchall()
+                    
+                    return [row[0] for row in rows if row[0] and row[0].strip()]
+                    
+        except Exception as e:
+            self.logger.error(f"Error getting text blocks for document {document_id}: {e}")
+            return []
+    
+    def _get_tables_for_document(self, document_id: int) -> List[Dict]:
+        """Get tables for a document from database"""
+        try:
+            with self.db_manager.get_connection() as conn:
+                with conn.cursor() as cur:
+                    sql = """
+                    SELECT table_data, page_number, bbox_x0, bbox_y0, bbox_x1, bbox_y1
+                    FROM pdf_tables 
+                    WHERE document_id = %s 
+                    ORDER BY page_number, table_index;
+                    """
+                    cur.execute(sql, (document_id,))
+                    rows = cur.fetchall()
+                    
+                    tables = []
+                    for row in rows:
+                        table_data_json = row[0]
+                        if isinstance(table_data_json, str):
+                            import json
+                            table_data = json.loads(table_data_json)
+                        else:
+                            table_data = table_data_json
+                        
+                        tables.append({
+                            'data': table_data.get('rows', []),
+                            'page_number': row[1],
+                            'bbox': (row[2], row[3], row[4], row[5]) if row[2] is not None else None
+                        })
+                    
+                    return tables
+                    
+        except Exception as e:
+            self.logger.error(f"Error getting tables for document {document_id}: {e}")
+            return []
+    
+    def get_structured_content_summary(self) -> List[Dict[str, Any]]:
+        """Get structured content processing summary"""
+        return self.db_manager.get_structured_content_summary()
+    
+    def search_structured_content(self, search_term: str, section: str = None) -> List[Dict[str, Any]]:
+        """Search in structured content"""
+        return self.db_manager.search_structured_content(search_term, section)
+    
+    def get_assets_by_type(self, asset_type: str) -> List[Dict[str, Any]]:
+        """Get assets by type from structured content"""
+        return self.db_manager.get_assets_by_type(asset_type)
+    
+    def _extract_and_store_dynamic_sections(self, document_id: int, notice_id: str, 
+                                           file_name: str, parsed_data: Dict[str, Any]):
+        """Extract dynamic sections and store in database"""
+        try:
+            self.logger.info(f"Extracting dynamic sections for {file_name}")
+            
+            # Prepare text blocks for processing
+            text_blocks = [block.text for block in parsed_data['text_blocks']]
+            
+            # Prepare tables with metadata
+            tables = []
+            for table in parsed_data['tables']:
+                tables.append({
+                    'data': table.data,
+                    'page_number': table.page_number,
+                    'table_index': table.table_index,
+                    'bbox': table.bbox
+                })
+            
+            # Prepare images with metadata
+            images = []
+            for image in parsed_data['images']:
+                images.append({
+                    'page_number': image.page_number,
+                    'image_index': image.image_index,
+                    'image_path': image.image_path,
+                    'width': image.width,
+                    'height': image.height,
+                    'format_type': image.format_type,
+                    'bbox': image.bbox
+                })
+            
+            # Process dynamic sections
+            result = self.dynamic_processor.process_document(
+                notice_id, file_name, text_blocks, tables, images
+            )
+            
+            # Store result in database
+            success = self.db_manager.store_dynamic_sections(document_id, result)
+            
+            if success:
+                self.logger.info(f"Stored dynamic sections for {file_name} (confidence: {result.confidence_score:.2f})")
+            else:
+                self.logger.error(f"Failed to store dynamic sections for {file_name}")
+                
+        except Exception as e:
+            self.logger.error(f"Error extracting dynamic sections for {file_name}: {e}")
+    
+    def process_dynamic_sections_batch(self, limit: int = 10) -> Dict[str, Any]:
+        """Process dynamic sections for documents that don't have them yet"""
+        self.logger.info("Starting batch dynamic section processing")
+        
+        # Get documents that need dynamic section processing
+        documents = self.db_manager.get_documents_for_dynamic_processing(limit)
+        
+        if not documents:
+            self.logger.info("No documents need dynamic section processing")
+            return {
+                'processed_docs': 0,
+                'failed_docs': 0,
+                'message': 'No documents to process'
+            }
+        
+        processed_count = 0
+        failed_count = 0
+        
+        for doc in documents:
+            try:
+                self.logger.info(f"Processing dynamic sections for document ID {doc['id']}: {doc['file_name']}")
+                
+                # Update status to processing
+                self.db_manager.store_dynamic_sections(doc['id'], type('MockResult', (), {
+                    'success': False,
+                    'error_message': None,
+                    'document_metadata': {},
+                    'sections': {}
+                })())
+                
+                # Get raw content for this document
+                text_blocks = self._get_text_blocks_for_document(doc['id'])
+                tables = self._get_tables_for_document(doc['id'])
+                images = self._get_images_for_document(doc['id'])
+                
+                # Process dynamic sections
+                result = self.dynamic_processor.process_document(
+                    doc['notice_id'], doc['file_name'], text_blocks, tables, images
+                )
+                
+                if result.success:
+                    success = self.db_manager.store_dynamic_sections(doc['id'], result)
+                    
+                    if success:
+                        processed_count += 1
+                        self.logger.info(f"Successfully processed dynamic sections for {doc['file_name']} (confidence: {result.confidence_score:.2f})")
+                    else:
+                        failed_count += 1
+                        self.logger.error(f"Failed to store dynamic sections for {doc['file_name']}")
+                else:
+                    # Store failed result
+                    self.db_manager.store_dynamic_sections(doc['id'], result)
+                    failed_count += 1
+                    self.logger.error(f"Dynamic section processing failed for {doc['file_name']}: {result.error_message}")
+                    
+            except Exception as e:
+                failed_count += 1
+                self.logger.error(f"Error processing dynamic sections for {doc['file_name']}: {e}")
+        
+        result = {
+            'processed_docs': processed_count,
+            'failed_docs': failed_count,
+            'total_docs': len(documents)
+        }
+        
+        self.logger.info(f"Batch dynamic section processing completed: {result}")
+        return result
+    
+    def _get_images_for_document(self, document_id: int) -> List[Dict]:
+        """Get images for a document from database"""
+        try:
+            with self.db_manager.get_connection() as conn:
+                with conn.cursor() as cur:
+                    sql = """
+                    SELECT page_number, image_index, image_path, width, height, format, 
+                           bbox_x0, bbox_y0, bbox_x1, bbox_y1
+                    FROM pdf_images 
+                    WHERE document_id = %s 
+                    ORDER BY page_number, image_index;
+                    """
+                    cur.execute(sql, (document_id,))
+                    rows = cur.fetchall()
+                    
+                    images = []
+                    for row in rows:
+                        images.append({
+                            'page_number': row[0],
+                            'image_index': row[1],
+                            'image_path': row[2],
+                            'width': row[3],
+                            'height': row[4],
+                            'format_type': row[5],
+                            'bbox': (row[6], row[7], row[8], row[9]) if row[6] is not None else None
+                        })
+                    
+                    return images
+                    
+        except Exception as e:
+            self.logger.error(f"Error getting images for document {document_id}: {e}")
+            return []
+    
+    def get_dynamic_section_summary(self) -> List[Dict[str, Any]]:
+        """Get dynamic section processing summary"""
+        return self.db_manager.get_section_summary()
+    
+    def search_dynamic_sections(self, search_term: str, section_type: str = None) -> List[Dict[str, Any]]:
+        """Search in dynamic sections"""
+        return self.db_manager.search_sections(search_term, section_type)
+    
+    def get_sections_by_document(self, notice_id: str, file_name: str) -> List[Dict[str, Any]]:
+        """Get all sections for a specific document"""
+        return self.db_manager.get_sections_by_document(notice_id, file_name)

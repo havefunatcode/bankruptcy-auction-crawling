@@ -25,6 +25,12 @@ def main():
     parser.add_argument('--async-mode', action='store_true', help='Use async processing for better performance')
     parser.add_argument('--concurrent', type=int, default=3, help='Number of concurrent async tasks')
     
+    # Structured content options
+    parser.add_argument('--extract-structured', action='store_true', help='Extract structured content from existing PDFs')
+    parser.add_argument('--structured-summary', action='store_true', help='Show structured content summary')
+    parser.add_argument('--search-structured', help='Search in structured content')
+    parser.add_argument('--assets-by-type', help='Get assets by type from structured content')
+    
     args = parser.parse_args()
     
     # Setup logging
@@ -91,6 +97,104 @@ def main():
                     print()
             else:
                 print("No results found.")
+            
+            return 0
+        
+        # Extract structured content from existing PDFs
+        if args.extract_structured:
+            print("Extracting structured content from existing PDFs...")
+            print("=" * 50)
+            
+            if not processor.test_connections():
+                print("❌ Database connection failed")
+                return 1
+            
+            stats = processor.process_structured_content_batch()
+            
+            print(f"Processed Documents: {stats['processed_docs']}")
+            print(f"Failed Documents: {stats['failed_docs']}")
+            print(f"Total Documents: {stats['total_docs']}")
+            
+            if stats['failed_docs'] == 0:
+                print("✅ All documents processed successfully")
+            else:
+                print(f"⚠️ {stats['failed_docs']} documents failed processing")
+            
+            return 0
+        
+        # Show structured content summary
+        if args.structured_summary:
+            print("Structured Content Summary:")
+            print("=" * 50)
+            
+            summary = processor.get_structured_content_summary()
+            if summary:
+                for item in summary:
+                    print(f"Notice: {item['notice_id']}")
+                    print(f"  File: {item['file_name']}")
+                    print(f"  Status: {item['extraction_status']}")
+                    print(f"  Document Title: {item['document_title'] or 'N/A'}")
+                    print(f"  Asset Type: {item['asset_type'] or 'N/A'}")
+                    print(f"  Asset Count: {item['asset_count'] or 0}")
+                    print(f"  Bidding Type: {item['bidding_type'] or 'N/A'}")
+                    print(f"  Trustee: {item['trustee_org'] or 'N/A'}")
+                    print(f"  Missing Sections: {item['missing_sections_count'] or 0}")
+                    print(f"  Processed: {item['processed_at']}")
+                    print()
+            else:
+                print("No structured content found.")
+            
+            return 0
+        
+        # Search structured content
+        if args.search_structured:
+            print(f"Searching structured content for: '{args.search_structured}'")
+            print("=" * 50)
+            
+            results = processor.search_structured_content(args.search_structured)
+            if results:
+                for result in results:
+                    print(f"Notice: {result['notice_id']}")
+                    print(f"  File: {result['file_name']}")
+                    if 'section_data' in result:
+                        print(f"  Section Data: {str(result['section_data'])[:200]}...")
+                    else:
+                        # Show relevant parts of structured content
+                        content = result.get('structured_content', {})
+                        if content:
+                            sections = content.get('sections', {})
+                            for section_name, section_data in sections.items():
+                                if args.search_structured.lower() in str(section_data).lower():
+                                    print(f"  Found in {section_name}: {str(section_data)[:200]}...")
+                                    break
+                    print()
+            else:
+                print("No results found in structured content.")
+            
+            return 0
+        
+        # Get assets by type
+        if args.assets_by_type:
+            print(f"Assets of type: '{args.assets_by_type}'")
+            print("=" * 50)
+            
+            results = processor.get_assets_by_type(args.assets_by_type)
+            if results:
+                for result in results:
+                    print(f"Notice: {result['notice_id']}")
+                    print(f"  File: {result['file_name']}")
+                    print(f"  Asset Type: {result['asset_type']}")
+                    
+                    asset_data = result.get('asset', {})
+                    if asset_data:
+                        print(f"  Registration No: {asset_data.get('registration_no', 'N/A')}")
+                        print(f"  Title: {asset_data.get('title', 'N/A')}")
+                        print(f"  Application Date: {asset_data.get('application_date', 'N/A')}")
+                        print(f"  Registration Date: {asset_data.get('registration_date', 'N/A')}")
+                        print(f"  Remark: {asset_data.get('remark', 'N/A')}")
+                    print()
+            else:
+                print("No assets found of this type.")
             
             return 0
         

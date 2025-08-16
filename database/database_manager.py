@@ -281,6 +281,500 @@ class DatabaseManager:
             self.logger.error(f"Failed to search text content: {e}")
             return []
     
+    def update_structured_content(self, document_id: int, structured_data: Dict[str, Any],
+                                 status: str = 'completed', error_message: str = None) -> bool:
+        """Update structured content for a document"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cur:
+                    sql = """
+                    UPDATE pdf_documents 
+                    SET structured_content = %s,
+                        extraction_status = %s,
+                        extraction_error = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s;
+                    """
+                    
+                    cur.execute(sql, (
+                        json.dumps(structured_data, ensure_ascii=False) if structured_data else None,
+                        status,
+                        error_message,
+                        document_id
+                    ))
+                    
+                    affected_rows = cur.rowcount
+                    conn.commit()
+                    
+                    if affected_rows > 0:
+                        self.logger.info(f"Updated structured content for document ID {document_id}")
+                        return True
+                    else:
+                        self.logger.warning(f"No document found with ID {document_id}")
+                        return False
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to update structured content for document {document_id}: {e}")
+            return False
+
+    def get_documents_for_structuring(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get documents that need structured content extraction"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                    sql = """
+                    SELECT pd.id, pd.notice_id, pd.file_name, pd.file_path,
+                           pd.extraction_status, pd.structured_content
+                    FROM pdf_documents pd
+                    WHERE pd.extraction_status IN ('pending', 'failed')
+                       OR pd.structured_content IS NULL
+                    ORDER BY pd.processed_at DESC
+                    LIMIT %s;
+                    """
+                    
+                    cur.execute(sql, (limit,))
+                    return [dict(row) for row in cur.fetchall()]
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to get documents for structuring: {e}")
+            return []
+
+    def get_structured_content_summary(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get structured content summary using the view"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                    sql = "SELECT * FROM pdf_structured_analysis LIMIT %s;"
+                    cur.execute(sql, (limit,))
+                    
+                    return [dict(row) for row in cur.fetchall()]
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to get structured content summary: {e}")
+            return []
+
+    def search_structured_content(self, search_term: str, section: str = None, 
+                                 limit: int = 50) -> List[Dict[str, Any]]:
+        """Search in structured content"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                    if section:
+                        # Search in specific section
+                        sql = """
+                        SELECT pd.notice_id, pd.file_name, 
+                               pd.structured_content->'sections'->%s as section_data
+                        FROM pdf_documents pd
+                        WHERE pd.structured_content->'sections'->%s::text ILIKE %s
+                        ORDER BY pd.processed_at DESC
+                        LIMIT %s;
+                        """
+                        cur.execute(sql, (section, section, f'%{search_term}%', limit))
+                    else:
+                        # Search in all structured content
+                        sql = """
+                        SELECT pd.notice_id, pd.file_name, pd.structured_content
+                        FROM pdf_documents pd
+                        WHERE pd.structured_content::text ILIKE %s
+                        ORDER BY pd.processed_at DESC
+                        LIMIT %s;
+                        """
+                        cur.execute(sql, (f'%{search_term}%', limit))
+                    
+                    return [dict(row) for row in cur.fetchall()]
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to search structured content: {e}")
+            return []
+
+    def get_assets_by_type(self, asset_type: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get all assets of a specific type"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                    sql = """
+                    SELECT pd.notice_id, pd.file_name,
+                           pd.structured_content->'sections'->'매각대상자산'->>'asset_type' as asset_type,
+                           jsonb_array_elements(
+                               COALESCE(pd.structured_content->'sections'->'매각대상자산'->'assets', '[]'::jsonb)
+                           ) as asset
+                    FROM pdf_documents pd
+                    WHERE pd.structured_content->'sections'->'매각대상자산'->>'asset_type' ILIKE %s
+                    ORDER BY pd.processed_at DESC
+                    LIMIT %s;
+                    """
+                    
+                    cur.execute(sql, (f'%{asset_type}%', limit))
+                    return [dict(row) for row in cur.fetchall()]
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to get assets by type: {e}")
+            return []
+
+    # Dynamic Section Processing Methods
+    
+    def store_dynamic_sections(self, document_id: int, processing_result) -> bool:
+        """Store dynamic section processing result"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor() as cur:
+                    # Update document with dynamic sections JSON and metadata
+                    sql_update = """
+                    UPDATE pdf_documents 
+                    SET dynamic_sections = %s,
+                        document_metadata = %s,
+                        section_extraction_status = %s,
+                        section_extraction_error = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s;
+                    """
+                    
+                    # Convert processing result to JSON-serializable format
+                    from pdf_processing.dynamic_section_processor import DynamicSectionProcessor
+                    processor = DynamicSectionProcessor()
+                    json_result = processor.to_json_serializable(processing_result)
+                    
+                    cur.execute(sql_update, (
+                        json.dumps(json_result, ensure_ascii=False),
+                        json.dumps(processing_result.document_metadata, ensure_ascii=False),
+                        'completed' if processing_result.success else 'failed',
+                        processing_result.error_message,
+                        document_id
+                    ))
+                    
+                    if not processing_result.success:
+                        conn.commit()
+                        return True
+                    
+                    # Store individual sections
+                    for section_key, section_content in processing_result.sections.items():
+                        section_id = self._insert_section(cur, document_id, section_key, section_content)
+                        
+                        if section_id:
+                            # Store subsections
+                            for subsection_key, subsection_content in section_content.subsections.items():
+                                self._insert_subsection(cur, section_id, subsection_key, subsection_content)
+                            
+                            # Create section-table relationships
+                            for table in section_content.tables:
+                                self._link_section_table(cur, section_id, table)
+                            
+                            # Create section-image relationships
+                            for image in section_content.images:
+                                self._link_section_image(cur, section_id, image)
+                    
+                    # Store processing result record
+                    self._insert_processing_result(cur, document_id, 'dynamic_sections', processing_result)
+                    
+                    conn.commit()
+                    self.logger.info(f"Stored dynamic sections for document ID {document_id}")
+                    return True
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to store dynamic sections for document {document_id}: {e}")
+            return False
+    
+    def _insert_section(self, cursor, document_id: int, section_key: str, section_content) -> Optional[int]:
+        """Insert a section record and return section ID"""
+        try:
+            sql = """
+            INSERT INTO pdf_sections 
+            (document_id, section_key, section_name, section_type, section_number, 
+             original_title, text_content, start_line, content_length, line_count, section_metadata)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (document_id, section_key) 
+            DO UPDATE SET 
+                section_name = EXCLUDED.section_name,
+                section_type = EXCLUDED.section_type,
+                text_content = EXCLUDED.text_content,
+                section_metadata = EXCLUDED.section_metadata
+            RETURNING id;
+            """
+            
+            cursor.execute(sql, (
+                document_id,
+                section_key,
+                section_content.section_name,
+                section_content.metadata.get('section_type'),
+                section_content.metadata.get('section_number'),
+                section_content.metadata.get('original_title'),
+                section_content.text_content,
+                section_content.metadata.get('start_line'),
+                section_content.metadata.get('content_length'),
+                section_content.metadata.get('line_count'),
+                json.dumps(section_content.metadata, ensure_ascii=False)
+            ))
+            
+            result = cursor.fetchone()
+            return result[0] if result else None
+            
+        except Exception as e:
+            self.logger.error(f"Failed to insert section {section_key}: {e}")
+            return None
+    
+    def _insert_subsection(self, cursor, section_id: int, subsection_key: str, subsection_content) -> bool:
+        """Insert a subsection record"""
+        try:
+            sql = """
+            INSERT INTO pdf_subsections 
+            (section_id, subsection_key, subsection_name, text_content, subsection_metadata)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (section_id, subsection_key) 
+            DO UPDATE SET 
+                subsection_name = EXCLUDED.subsection_name,
+                text_content = EXCLUDED.text_content,
+                subsection_metadata = EXCLUDED.subsection_metadata;
+            """
+            
+            cursor.execute(sql, (
+                section_id,
+                subsection_key,
+                subsection_content.section_name,
+                subsection_content.text_content,
+                json.dumps(subsection_content.metadata, ensure_ascii=False)
+            ))
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to insert subsection {subsection_key}: {e}")
+            return False
+    
+    def _link_section_table(self, cursor, section_id: int, table: Dict[str, Any]) -> bool:
+        """Link a table to a section"""
+        try:
+            # Find table ID based on table metadata
+            table_page = table.get('page_number')
+            if table_page is None:
+                return False
+                
+            # Get table ID from pdf_tables
+            sql_find = """
+            SELECT id FROM pdf_tables 
+            WHERE document_id = (
+                SELECT document_id FROM pdf_sections WHERE id = %s
+            ) AND page_number = %s
+            LIMIT 1;
+            """
+            
+            cursor.execute(sql_find, (section_id, table_page))
+            table_record = cursor.fetchone()
+            
+            if not table_record:
+                return False
+                
+            table_id = table_record[0]
+            
+            # Insert relationship
+            sql_insert = """
+            INSERT INTO pdf_section_tables 
+            (section_id, table_id, assignment_confidence, assignment_reason)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (section_id, table_id) DO NOTHING;
+            """
+            
+            cursor.execute(sql_insert, (
+                section_id,
+                table_id,
+                1.0,  # Default confidence
+                'automatic_assignment'
+            ))
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to link table to section {section_id}: {e}")
+            return False
+    
+    def _link_section_image(self, cursor, section_id: int, image: Dict[str, Any]) -> bool:
+        """Link an image to a section"""
+        try:
+            # Find image ID based on image metadata
+            image_page = image.get('page_number')
+            if image_page is None:
+                return False
+                
+            # Get image ID from pdf_images
+            sql_find = """
+            SELECT id FROM pdf_images 
+            WHERE document_id = (
+                SELECT document_id FROM pdf_sections WHERE id = %s
+            ) AND page_number = %s
+            LIMIT 1;
+            """
+            
+            cursor.execute(sql_find, (section_id, image_page))
+            image_record = cursor.fetchone()
+            
+            if not image_record:
+                return False
+                
+            image_id = image_record[0]
+            
+            # Insert relationship
+            sql_insert = """
+            INSERT INTO pdf_section_images 
+            (section_id, image_id, assignment_confidence, assignment_reason)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (section_id, image_id) DO NOTHING;
+            """
+            
+            cursor.execute(sql_insert, (
+                section_id,
+                image_id,
+                1.0,  # Default confidence
+                'automatic_assignment'
+            ))
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to link image to section {section_id}: {e}")
+            return False
+    
+    def _insert_processing_result(self, cursor, document_id: int, method: str, result) -> bool:
+        """Insert processing result record"""
+        try:
+            sql = """
+            INSERT INTO pdf_processing_results 
+            (document_id, processing_method, success, confidence_score, 
+             processing_notes, error_message, result_data)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (document_id, processing_method) 
+            DO UPDATE SET 
+                success = EXCLUDED.success,
+                confidence_score = EXCLUDED.confidence_score,
+                processing_notes = EXCLUDED.processing_notes,
+                error_message = EXCLUDED.error_message,
+                result_data = EXCLUDED.result_data,
+                created_at = CURRENT_TIMESTAMP;
+            """
+            
+            # Convert processing result to JSON
+            from pdf_processing.dynamic_section_processor import DynamicSectionProcessor
+            processor = DynamicSectionProcessor()
+            json_result = processor.to_json_serializable(result)
+            
+            cursor.execute(sql, (
+                document_id,
+                method,
+                result.success,
+                result.confidence_score,
+                result.processing_notes,
+                result.error_message,
+                json.dumps(json_result, ensure_ascii=False)
+            ))
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to insert processing result: {e}")
+            return False
+    
+    def get_documents_for_dynamic_processing(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get documents that need dynamic section processing"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                    sql = """
+                    SELECT pd.id, pd.notice_id, pd.file_name, pd.file_path,
+                           pd.section_extraction_status, pd.dynamic_sections
+                    FROM pdf_documents pd
+                    WHERE pd.section_extraction_status IN ('pending', 'failed')
+                       OR pd.dynamic_sections IS NULL
+                    ORDER BY pd.processed_at DESC
+                    LIMIT %s;
+                    """
+                    
+                    cur.execute(sql, (limit,))
+                    return [dict(row) for row in cur.fetchall()]
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to get documents for dynamic processing: {e}")
+            return []
+    
+    def get_section_summary(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get section processing summary"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                    sql = "SELECT * FROM pdf_section_analysis LIMIT %s;"
+                    cur.execute(sql, (limit,))
+                    
+                    return [dict(row) for row in cur.fetchall()]
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to get section summary: {e}")
+            return []
+    
+    def search_sections(self, search_term: str, section_type: str = None, 
+                       limit: int = 50) -> List[Dict[str, Any]]:
+        """Search sections by content or type"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                    if section_type:
+                        sql = """
+                        SELECT pd.notice_id, pd.file_name, ps.section_name, 
+                               ps.section_type, ps.text_content,
+                               ts_rank(to_tsvector(ps.text_content), 
+                                      plainto_tsquery(%s)) as relevance
+                        FROM pdf_documents pd
+                        JOIN pdf_sections ps ON pd.id = ps.document_id
+                        WHERE ps.section_type = %s 
+                          AND ps.text_content ILIKE %s
+                        ORDER BY relevance DESC
+                        LIMIT %s;
+                        """
+                        cur.execute(sql, (search_term, section_type, f'%{search_term}%', limit))
+                    else:
+                        sql = """
+                        SELECT pd.notice_id, pd.file_name, ps.section_name, 
+                               ps.section_type, ps.text_content,
+                               1.0 as relevance
+                        FROM pdf_documents pd
+                        JOIN pdf_sections ps ON pd.id = ps.document_id
+                        WHERE ps.text_content ILIKE %s
+                        ORDER BY pd.notice_id, ps.section_key
+                        LIMIT %s;
+                        """
+                        cur.execute(sql, (f'%{search_term}%', limit))
+                    
+                    return [dict(row) for row in cur.fetchall()]
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to search sections: {e}")
+            return []
+    
+    def get_sections_by_document(self, notice_id: str, file_name: str) -> List[Dict[str, Any]]:
+        """Get all sections for a specific document"""
+        try:
+            with self.get_connection() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                    sql = """
+                    SELECT ps.section_key, ps.section_name, ps.section_type,
+                           ps.text_content, ps.section_metadata,
+                           COUNT(pst.table_id) as tables_count,
+                           COUNT(psi.image_id) as images_count,
+                           COUNT(pss.id) as subsections_count
+                    FROM pdf_documents pd
+                    JOIN pdf_sections ps ON pd.id = ps.document_id
+                    LEFT JOIN pdf_section_tables pst ON ps.id = pst.section_id
+                    LEFT JOIN pdf_section_images psi ON ps.id = psi.section_id
+                    LEFT JOIN pdf_subsections pss ON ps.id = pss.section_id
+                    WHERE pd.notice_id = %s AND pd.file_name = %s
+                    GROUP BY ps.id, ps.section_key, ps.section_name, ps.section_type,
+                             ps.text_content, ps.section_metadata
+                    ORDER BY ps.section_key;
+                    """
+                    
+                    cur.execute(sql, (notice_id, file_name))
+                    return [dict(row) for row in cur.fetchall()]
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to get sections for document: {e}")
+            return []
+
     def test_connection(self) -> bool:
         """Test database connection"""
         try:
