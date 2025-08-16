@@ -154,21 +154,27 @@ class RuleBasedSectionDetector:
         }
         
         # Thresholds
-        self.HEADER_SCORE_THRESHOLD = 0.5  # Lower threshold to catch more headers
+        self.HEADER_SCORE_THRESHOLD = 0.5  # Default threshold for digital PDFs
+        self.OCR_HEADER_SCORE_THRESHOLD = 0.3  # Lower threshold for OCR/scanned PDFs
         self.MAX_HEADER_LENGTH = 200  # Increased to handle longer composite headers  
         self.MIN_HEADER_LENGTH = 3
         
-    def detect_section_headers(self, blocks: List[Block]) -> List[SectionHeader]:
+    def detect_section_headers(self, blocks: List[Block], is_scanned_pdf: bool = False) -> List[SectionHeader]:
         """
         Detect section headers from text blocks
         
         Args:
             blocks: List of text blocks with metadata
+            is_scanned_pdf: Whether this is a scanned PDF requiring OCR processing
             
         Returns:
             List of detected section headers
         """
-        self.logger.info(f"Detecting section headers from {len(blocks)} blocks")
+        self.logger.info(f"Detecting section headers from {len(blocks)} blocks (scanned: {is_scanned_pdf})")
+        
+        # Use appropriate threshold based on PDF type
+        threshold = self.OCR_HEADER_SCORE_THRESHOLD if is_scanned_pdf else self.HEADER_SCORE_THRESHOLD
+        self.logger.info(f"Using threshold: {threshold:.2f} for {'scanned' if is_scanned_pdf else 'digital'} PDF")
         
         # Calculate baseline metrics for comparison
         baseline_metrics = self._calculate_baseline_metrics(blocks)
@@ -186,8 +192,8 @@ class RuleBasedSectionDetector:
                 block, baseline_metrics, i, blocks
             )
             
-            # Check if score exceeds threshold
-            if header_score >= self.HEADER_SCORE_THRESHOLD:
+            # Check if score exceeds threshold (using dynamic threshold)
+            if header_score >= threshold:
                 # Determine section type and label
                 section_type, normalized_label, pattern_matched = self._classify_header(text)
                 
@@ -203,8 +209,12 @@ class RuleBasedSectionDetector:
                 headers.append(header)
                 
                 self.logger.debug(f"Header detected: '{text[:50]}...' (score: {header_score:.2f})")
+            else:
+                # Log near-misses for debugging
+                if header_score >= threshold * 0.8:
+                    self.logger.debug(f"Near-miss header: '{text[:30]}...' (score: {header_score:.2f}, threshold: {threshold:.2f})")
         
-        self.logger.info(f"Detected {len(headers)} section headers")
+        self.logger.info(f"Detected {len(headers)} section headers using threshold {threshold:.2f}")
         return headers
     
     def _calculate_baseline_metrics(self, blocks: List[Block]) -> Dict[str, float]:
@@ -406,7 +416,7 @@ def test_section_detection():
         Block(1, (0, 380, 500, 400), "입찰 시 다음 사항을 유의하시기 바랍니다.", font_size=12.0),
     ]
     
-    headers = detector.detect_section_headers(sample_blocks)
+    headers = detector.detect_section_headers(sample_blocks, is_scanned_pdf=False)
     
     print(f"Detected {len(headers)} headers:")
     for header in headers:

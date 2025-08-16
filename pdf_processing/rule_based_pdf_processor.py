@@ -6,8 +6,9 @@ import os
 import fitz  # PyMuPDF
 import pdfplumber
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 import io
+import numpy as np
 from typing import Dict, Any, List, Tuple, Optional
 from dataclasses import dataclass
 import json
@@ -57,8 +58,9 @@ class RuleBasedPDFProcessor:
         
         # Processing configuration
         self.max_pages_to_analyze = 50  # Limit for very large documents
-        self.ocr_config = '--oem 1 --psm 4 -l kor+eng'
-        self.image_dpi = 300
+        # Enhanced OCR configuration for Korean documents
+        self.ocr_config = '--oem 1 --psm 6 -l kor+eng -c preserve_interword_spaces=1'
+        self.image_dpi = 400  # Increased DPI for better OCR quality
         
     def process_pdf(self, pdf_path: str, notice_id: str) -> ProcessingResult:
         """
@@ -91,8 +93,8 @@ class RuleBasedPDFProcessor:
             
             self.logger.info(f"Extracted {len(blocks)} text blocks")
             
-            # Step 3: Detect section headers
-            section_headers = self.section_detector.detect_section_headers(blocks)
+            # Step 3: Detect section headers (pass PDF type for threshold selection)
+            section_headers = self.section_detector.detect_section_headers(blocks, is_scanned_pdf=not pdf_type_result.is_digital)
             self.logger.info(f"Detected {len(section_headers)} section headers")
             
             # Step 4: Determine section boundaries
@@ -205,11 +207,14 @@ class RuleBasedPDFProcessor:
             for page_num in range(min(len(doc), self.max_pages_to_analyze)):
                 page = doc[page_num]
                 
-                # Convert page to image
+                # Convert page to image with higher quality
                 mat = fitz.Matrix(self.image_dpi / 72, self.image_dpi / 72)
                 pix = page.get_pixmap(matrix=mat)
                 img_data = pix.tobytes("png")
                 img = Image.open(io.BytesIO(img_data))
+                
+                # Preprocess image for better OCR
+                img = self._preprocess_image_for_ocr(img)
                 
                 # Run OCR
                 ocr_data = pytesseract.image_to_data(
@@ -571,6 +576,45 @@ class RuleBasedPDFProcessor:
             'extraction_methods': evidence_report.get('method_usage', {}),
             'confidence_distribution': evidence_report.get('confidence_distribution', {})
         }
+    
+    def _preprocess_image_for_ocr(self, image: Image.Image) -> Image.Image:
+        """
+        Preprocess image to improve OCR quality
+        """
+        try:
+            # Convert to grayscale if not already
+            if image.mode != 'L':
+                image = image.convert('L')
+            
+            # Enhance contrast
+            enhancer = ImageEnhance.Contrast(image)
+            image = enhancer.enhance(1.5)  # Increase contrast by 50%
+            
+            # Enhance sharpness
+            enhancer = ImageEnhance.Sharpness(image)
+            image = enhancer.enhance(1.3)  # Increase sharpness by 30%
+            
+            # Apply slight denoising
+            image = image.filter(ImageFilter.MedianFilter(size=3))
+            
+            # Optional: Apply threshold to create cleaner black/white image
+            # Convert to numpy array for thresholding
+            import numpy as np
+            img_array = np.array(image)
+            
+            # Apply adaptive threshold or simple threshold
+            threshold = np.mean(img_array) * 0.8  # Dynamic threshold
+            img_array = np.where(img_array > threshold, 255, 0).astype(np.uint8)
+            
+            # Convert back to PIL Image
+            image = Image.fromarray(img_array, mode='L')
+            
+            self.logger.debug("Image preprocessing completed for OCR")
+            
+        except Exception as e:
+            self.logger.warning(f"Image preprocessing failed, using original: {e}")
+        
+        return image
 
 
 def test_rule_based_processor():
