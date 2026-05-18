@@ -1,0 +1,614 @@
+{
+  "file name" : "01_2025하단6348 주식매각공고.pdf",
+  "number of pages" : 9,
+  "author" : null,
+  "title" : null,
+  "creation date" : null,
+  "modification date" : null,
+  "kids" : [ {
+    "type" : "image",
+    "id" : 1,
+    "page number" : 1,
+    "bounding box" : [ 0.0, 0.0, 595.2, 841.68 ]
+  }, {
+    "type" : "image",
+    "id" : 10,
+    "page number" : 1,
+    "bounding box" : [ 240.0, 724.56, 360.96, 744.72 ]
+  }, {
+    "type" : "image",
+    "id" : 11,
+    "page number" : 1,
+    "bounding box" : [ 174.72, 693.84, 426.24, 709.2 ]
+  }, {
+    "type" : "image",
+    "id" : 12,
+    "page number" : 1,
+    "bounding box" : [ 88.32, 645.84, 153.6, 660.24 ]
+  }, {
+    "type" : "image",
+    "id" : 2,
+    "page number" : 1,
+    "bounding box" : [ 113.28, 549.84, 508.8, 624.72 ]
+  }, {
+    "type" : "image",
+    "id" : 6,
+    "page number" : 1,
+    "bounding box" : [ 86.4, 489.36, 245.76, 505.68 ]
+  }, {
+    "type" : "image",
+    "id" : 5,
+    "page number" : 1,
+    "bounding box" : [ 99.84, 440.4, 403.2, 479.76 ]
+  }, {
+    "type" : "image",
+    "id" : 9,
+    "page number" : 1,
+    "bounding box" : [ 201.6, 465.36, 226.56, 478.8 ]
+  }, {
+    "type" : "image",
+    "id" : 4,
+    "page number" : 1,
+    "bounding box" : [ 168.96, 413.52, 480.0, 427.92 ]
+  }, {
+    "type" : "image",
+    "id" : 3,
+    "page number" : 1,
+    "bounding box" : [ 99.84, 125.52, 510.72, 401.04 ]
+  }, {
+    "type" : "image",
+    "id" : 7,
+    "page number" : 1,
+    "bounding box" : [ 441.6, 284.88, 510.72, 299.28 ]
+  }, {
+    "type" : "image",
+    "id" : 8,
+    "page number" : 1,
+    "bounding box" : [ 122.88, 101.52, 512.64, 116.88 ]
+  }, {
+    "type" : "image",
+    "id" : 13,
+    "page number" : 2,
+    "bounding box" : [ 0.0, 0.0, 595.2, 841.68 ]
+  }, {
+    "type" : "image",
+    "id" : 15,
+    "page number" : 2,
+    "bounding box" : [ 88.32, 107.28, 514.56, 745.68 ]
+  }, {
+    "type" : "image",
+    "id" : 18,
+    "page number" : 2,
+    "bounding box" : [ 88.32, 587.28, 170.88, 601.68 ]
+  }, {
+    "type" : "image",
+    "id" : 14,
+    "page number" : 2,
+    "bounding box" : [ 88.32, 467.28, 226.56, 481.68 ]
+  }, {
+    "type" : "image",
+    "id" : 16,
+    "page number" : 2,
+    "bounding box" : [ 86.4, 299.28, 153.6, 314.64 ]
+  }, {
+    "type" : "image",
+    "id" : 17,
+    "page number" : 2,
+    "bounding box" : [ 86.4, 180.24, 159.36, 194.64 ]
+  }, {
+    "type" : "image",
+    "id" : 19,
+    "page number" : 3,
+    "bounding box" : [ 0.0, 0.0, 595.2, 841.68 ]
+  }, {
+    "type" : "image",
+    "id" : 23,
+    "page number" : 3,
+    "bounding box" : [ 86.4, 730.32, 286.08, 745.68 ]
+  }, {
+    "type" : "image",
+    "id" : 20,
+    "page number" : 3,
+    "bounding box" : [ 99.84, 634.32, 514.56, 720.72 ]
+  }, {
+    "type" : "image",
+    "id" : 25,
+    "page number" : 3,
+    "bounding box" : [ 97.92, 661.2, 109.44, 671.76 ]
+  }, {
+    "type" : "image",
+    "id" : 24,
+    "page number" : 3,
+    "bounding box" : [ 514.56, 644.88, 520.32, 647.76 ]
+  }, {
+    "type" : "image",
+    "id" : 21,
+    "page number" : 3,
+    "bounding box" : [ 266.88, 492.24, 347.52, 503.76 ]
+  }, {
+    "type" : "image",
+    "id" : 22,
+    "page number" : 3,
+    "bounding box" : [ 192.0, 338.64, 408.96, 385.68 ]
+  }, {
+    "type" : "image",
+    "id" : 26,
+    "page number" : 4,
+    "bounding box" : [ 0.0, 0.0, 595.2, 841.68 ]
+  }, {
+    "type" : "image",
+    "id" : 44,
+    "page number" : 4,
+    "bounding box" : [ 255.36, 724.56, 345.6, 744.72 ]
+  }, {
+    "type" : "image",
+    "id" : 45,
+    "page number" : 4,
+    "bounding box" : [ 97.92, 689.04, 172.8, 704.4 ]
+  }, {
+    "type" : "image",
+    "id" : 27,
+    "page number" : 4,
+    "bounding box" : [ 295.68, 592.08, 395.52, 663.12 ]
+  }, {
+    "type" : "image",
+    "id" : 28,
+    "page number" : 4,
+    "bounding box" : [ 96.0, 553.68, 153.6, 663.12 ]
+  }, {
+    "type" : "image",
+    "id" : 29,
+    "page number" : 4,
+    "bounding box" : [ 99.84, 510.48, 149.76, 524.88 ]
+  }, {
+    "type" : "image",
+    "id" : 30,
+    "page number" : 4,
+    "bounding box" : [ 322.56, 509.52, 372.48, 524.88 ]
+  }, {
+    "type" : "image",
+    "id" : 37,
+    "page number" : 4,
+    "bounding box" : [ 96.0, 460.56, 499.2, 474.96 ]
+  }, {
+    "type" : "image",
+    "id" : 36,
+    "page number" : 4,
+    "bounding box" : [ 253.44, 420.24, 328.32, 436.56 ]
+  }, {
+    "type" : "image",
+    "id" : 43,
+    "page number" : 4,
+    "bounding box" : [ 334.08, 426.96, 347.52, 430.8 ]
+  }, {
+    "type" : "image",
+    "id" : 38,
+    "page number" : 4,
+    "bounding box" : [ 97.92, 379.92, 172.8, 395.28 ]
+  }, {
+    "type" : "image",
+    "id" : 31,
+    "page number" : 4,
+    "bounding box" : [ 355.2, 338.64, 397.44, 353.04 ]
+  }, {
+    "type" : "image",
+    "id" : 42,
+    "page number" : 4,
+    "bounding box" : [ 222.72, 339.6, 236.16, 352.08 ]
+  }, {
+    "type" : "image",
+    "id" : 39,
+    "page number" : 4,
+    "bounding box" : [ 105.6, 327.12, 155.52, 341.52 ]
+  }, {
+    "type" : "image",
+    "id" : 35,
+    "page number" : 4,
+    "bounding box" : [ 213.12, 315.6, 501.12, 330.0 ]
+  }, {
+    "type" : "image",
+    "id" : 34,
+    "page number" : 4,
+    "bounding box" : [ 96.0, 227.28, 249.6, 280.08 ]
+  }, {
+    "type" : "image",
+    "id" : 40,
+    "page number" : 4,
+    "bounding box" : [ 407.04, 227.28, 432.0, 240.72 ]
+  }, {
+    "type" : "image",
+    "id" : 41,
+    "page number" : 4,
+    "bounding box" : [ 243.84, 230.16, 249.6, 238.8 ]
+  }, {
+    "type" : "image",
+    "id" : 33,
+    "page number" : 4,
+    "bounding box" : [ 251.52, 189.84, 312.96, 201.36 ]
+  }, {
+    "type" : "image",
+    "id" : 32,
+    "page number" : 4,
+    "bounding box" : [ 190.08, 110.16, 408.96, 160.08 ]
+  }, {
+    "type" : "image",
+    "id" : 46,
+    "page number" : 5,
+    "bounding box" : [ 0.0, 0.0, 595.2, 841.68 ]
+  }, {
+    "type" : "image",
+    "id" : 51,
+    "page number" : 5,
+    "bounding box" : [ 44.16, 731.28, 566.4, 807.12 ]
+  }, {
+    "type" : "image",
+    "id" : 95,
+    "page number" : 5,
+    "bounding box" : [ 537.6, 796.56, 545.28, 806.16 ]
+  }, {
+    "type" : "image",
+    "id" : 94,
+    "page number" : 5,
+    "bounding box" : [ 34.56, 727.44, 38.4, 745.68 ]
+  }, {
+    "type" : "image",
+    "id" : 73,
+    "page number" : 5,
+    "bounding box" : [ 42.24, 731.28, 153.6, 743.76 ]
+  }, {
+    "type" : "image",
+    "id" : 93,
+    "page number" : 5,
+    "bounding box" : [ 560.64, 727.44, 566.4, 738.96 ]
+  }, {
+    "type" : "image",
+    "id" : 76,
+    "page number" : 5,
+    "bounding box" : [ 560.64, 688.08, 566.4, 725.52 ]
+  }, {
+    "type" : "image",
+    "id" : 50,
+    "page number" : 5,
+    "bounding box" : [ 174.72, 694.8, 218.88, 722.64 ]
+  }, {
+    "type" : "image",
+    "id" : 47,
+    "page number" : 5,
+    "bounding box" : [ 311.04, 692.88, 408.96, 722.64 ]
+  }, {
+    "type" : "image",
+    "id" : 74,
+    "page number" : 5,
+    "bounding box" : [ 301.44, 705.36, 405.12, 710.16 ]
+  }, {
+    "type" : "image",
+    "id" : 75,
+    "page number" : 5,
+    "bounding box" : [ 424.32, 694.8, 468.48, 704.4 ]
+  }, {
+    "type" : "image",
+    "id" : 77,
+    "page number" : 5,
+    "bounding box" : [ 528.0, 693.84, 551.04, 703.44 ]
+  }, {
+    "type" : "image",
+    "id" : 78,
+    "page number" : 5,
+    "bounding box" : [ 339.84, 687.12, 416.64, 690.96 ]
+  }, {
+    "type" : "image",
+    "id" : 79,
+    "page number" : 5,
+    "bounding box" : [ 241.92, 657.36, 374.4, 671.76 ]
+  }, {
+    "type" : "image",
+    "id" : 80,
+    "page number" : 5,
+    "bounding box" : [ 236.16, 644.88, 374.4, 651.6 ]
+  }, {
+    "type" : "image",
+    "id" : 49,
+    "page number" : 5,
+    "bounding box" : [ 59.52, 619.92, 535.68, 646.8 ]
+  }, {
+    "type" : "image",
+    "id" : 81,
+    "page number" : 5,
+    "bounding box" : [ 397.44, 631.44, 478.08, 635.28 ]
+  }, {
+    "type" : "image",
+    "id" : 92,
+    "page number" : 5,
+    "bounding box" : [ 122.88, 604.56, 126.72, 618.0 ]
+  }, {
+    "type" : "image",
+    "id" : 91,
+    "page number" : 5,
+    "bounding box" : [ 211.2, 592.08, 215.04, 618.0 ]
+  }, {
+    "type" : "image",
+    "id" : 90,
+    "page number" : 5,
+    "bounding box" : [ 387.84, 603.6, 391.68, 617.04 ]
+  }, {
+    "type" : "image",
+    "id" : 89,
+    "page number" : 5,
+    "bounding box" : [ 278.4, 599.76, 303.36, 612.24 ]
+  }, {
+    "type" : "image",
+    "id" : 48,
+    "page number" : 5,
+    "bounding box" : [ 38.4, 600.72, 180.48, 610.32 ]
+  }, {
+    "type" : "image",
+    "id" : 88,
+    "page number" : 5,
+    "bounding box" : [ 556.8, 599.76, 564.48, 609.36 ]
+  }, {
+    "type" : "image",
+    "id" : 87,
+    "page number" : 5,
+    "bounding box" : [ 34.56, 591.12, 38.4, 603.6 ]
+  }, {
+    "type" : "image",
+    "id" : 86,
+    "page number" : 5,
+    "bounding box" : [ 299.52, 592.08, 303.36, 599.76 ]
+  }, {
+    "type" : "image",
+    "id" : 82,
+    "page number" : 5,
+    "bounding box" : [ 38.4, 576.72, 360.96, 588.24 ]
+  }, {
+    "type" : "image",
+    "id" : 83,
+    "page number" : 5,
+    "bounding box" : [ 226.56, 544.08, 374.4, 558.48 ]
+  }, {
+    "type" : "image",
+    "id" : 52,
+    "page number" : 5,
+    "bounding box" : [ 142.08, 512.4, 172.8, 523.92 ]
+  }, {
+    "type" : "image",
+    "id" : 54,
+    "page number" : 5,
+    "bounding box" : [ 506.88, 511.44, 541.44, 522.96 ]
+  }, {
+    "type" : "image",
+    "id" : 53,
+    "page number" : 5,
+    "bounding box" : [ 226.56, 512.4, 305.28, 522.96 ]
+  }, {
+    "type" : "image",
+    "id" : 61,
+    "page number" : 5,
+    "bounding box" : [ 364.8, 476.88, 405.12, 506.64 ]
+  }, {
+    "type" : "image",
+    "id" : 72,
+    "page number" : 5,
+    "bounding box" : [ 247.68, 476.88, 264.96, 505.68 ]
+  }, {
+    "type" : "image",
+    "id" : 85,
+    "page number" : 5,
+    "bounding box" : [ 247.68, 476.88, 264.96, 505.68 ]
+  }, {
+    "type" : "image",
+    "id" : 84,
+    "page number" : 5,
+    "bounding box" : [ 309.12, 485.52, 334.08, 504.72 ]
+  }, {
+    "type" : "image",
+    "id" : 55,
+    "page number" : 5,
+    "bounding box" : [ 485.76, 479.76, 506.88, 504.72 ]
+  }, {
+    "type" : "image",
+    "id" : 60,
+    "page number" : 5,
+    "bounding box" : [ 40.32, 254.16, 564.48, 496.08 ]
+  }, {
+    "type" : "image",
+    "id" : 71,
+    "page number" : 5,
+    "bounding box" : [ 560.64, 235.92, 564.48, 240.72 ]
+  }, {
+    "type" : "image",
+    "id" : 56,
+    "page number" : 5,
+    "bounding box" : [ 36.48, 49.68, 161.28, 104.4 ]
+  }, {
+    "type" : "image",
+    "id" : 70,
+    "page number" : 5,
+    "bounding box" : [ 355.2, 98.64, 360.96, 102.48 ]
+  }, {
+    "type" : "image",
+    "id" : 69,
+    "page number" : 5,
+    "bounding box" : [ 506.88, 96.72, 510.72, 102.48 ]
+  }, {
+    "type" : "image",
+    "id" : 59,
+    "page number" : 5,
+    "bounding box" : [ 122.88, 46.8, 537.6, 102.48 ]
+  }, {
+    "type" : "image",
+    "id" : 68,
+    "page number" : 5,
+    "bounding box" : [ 190.08, 90.96, 197.76, 96.72 ]
+  }, {
+    "type" : "image",
+    "id" : 67,
+    "page number" : 5,
+    "bounding box" : [ 174.72, 87.12, 178.56, 91.92 ]
+  }, {
+    "type" : "image",
+    "id" : 66,
+    "page number" : 5,
+    "bounding box" : [ 501.12, 70.8, 506.88, 73.68 ]
+  }, {
+    "type" : "image",
+    "id" : 65,
+    "page number" : 5,
+    "bounding box" : [ 385.92, 68.88, 391.68, 72.72 ]
+  }, {
+    "type" : "image",
+    "id" : 58,
+    "page number" : 5,
+    "bounding box" : [ 528.0, 61.2, 552.96, 72.72 ]
+  }, {
+    "type" : "image",
+    "id" : 64,
+    "page number" : 5,
+    "bounding box" : [ 197.76, 64.08, 203.52, 66.96 ]
+  }, {
+    "type" : "image",
+    "id" : 63,
+    "page number" : 5,
+    "bounding box" : [ 551.04, 63.12, 556.8, 66.96 ]
+  }, {
+    "type" : "image",
+    "id" : 57,
+    "page number" : 5,
+    "bounding box" : [ 480.0, 46.8, 522.24, 66.0 ]
+  }, {
+    "type" : "image",
+    "id" : 62,
+    "page number" : 5,
+    "bounding box" : [ 201.6, 46.8, 207.36, 51.6 ]
+  }, {
+    "type" : "image",
+    "id" : 96,
+    "page number" : 6,
+    "bounding box" : [ 0.0, 0.0, 595.2, 841.68 ]
+  }, {
+    "type" : "image",
+    "id" : 104,
+    "page number" : 6,
+    "bounding box" : [ 184.32, 743.76, 453.12, 762.96 ]
+  }, {
+    "type" : "image",
+    "id" : 105,
+    "page number" : 6,
+    "bounding box" : [ 140.16, 735.12, 180.48, 759.12 ]
+  }, {
+    "type" : "image",
+    "id" : 101,
+    "page number" : 6,
+    "bounding box" : [ 36.48, 202.32, 554.88, 706.32 ]
+  }, {
+    "type" : "image",
+    "id" : 109,
+    "page number" : 6,
+    "bounding box" : [ 456.96, 625.68, 552.96, 632.4 ]
+  }, {
+    "type" : "image",
+    "id" : 108,
+    "page number" : 6,
+    "bounding box" : [ 456.96, 594.96, 552.96, 601.68 ]
+  }, {
+    "type" : "image",
+    "id" : 107,
+    "page number" : 6,
+    "bounding box" : [ 512.64, 585.36, 518.4, 589.2 ]
+  }, {
+    "type" : "image",
+    "id" : 106,
+    "page number" : 6,
+    "bounding box" : [ 253.44, 566.16, 266.88, 577.68 ]
+  }, {
+    "type" : "image",
+    "id" : 97,
+    "page number" : 6,
+    "bounding box" : [ 456.96, 527.76, 552.96, 533.52 ]
+  }, {
+    "type" : "image",
+    "id" : 100,
+    "page number" : 6,
+    "bounding box" : [ 46.08, 453.84, 218.88, 503.76 ]
+  }, {
+    "type" : "image",
+    "id" : 98,
+    "page number" : 6,
+    "bounding box" : [ 456.96, 497.04, 552.96, 502.8 ]
+  }, {
+    "type" : "image",
+    "id" : 102,
+    "page number" : 6,
+    "bounding box" : [ 345.6, 460.56, 405.12, 474.0 ]
+  }, {
+    "type" : "image",
+    "id" : 103,
+    "page number" : 6,
+    "bounding box" : [ 456.96, 441.36, 554.88, 448.08 ]
+  }, {
+    "type" : "image",
+    "id" : 99,
+    "page number" : 6,
+    "bounding box" : [ 36.48, 67.92, 314.88, 80.4 ]
+  }, {
+    "type" : "image",
+    "id" : 110,
+    "page number" : 7,
+    "bounding box" : [ 0.0, 0.0, 595.2, 841.68 ]
+  }, {
+    "type" : "image",
+    "id" : 112,
+    "page number" : 7,
+    "bounding box" : [ 36.48, 162.0, 554.88, 744.72 ]
+  }, {
+    "type" : "image",
+    "id" : 114,
+    "page number" : 7,
+    "bounding box" : [ 80.64, 555.6, 84.48, 577.68 ]
+  }, {
+    "type" : "image",
+    "id" : 113,
+    "page number" : 7,
+    "bounding box" : [ 253.44, 360.72, 339.84, 377.04 ]
+  }, {
+    "type" : "image",
+    "id" : 111,
+    "page number" : 7,
+    "bounding box" : [ 36.48, 69.84, 314.88, 82.32 ]
+  }, {
+    "type" : "image",
+    "id" : 115,
+    "page number" : 8,
+    "bounding box" : [ 0.0, 0.0, 595.2, 841.68 ]
+  }, {
+    "type" : "image",
+    "id" : 116,
+    "page number" : 8,
+    "bounding box" : [ 36.48, 70.8, 552.96, 744.72 ]
+  }, {
+    "type" : "image",
+    "id" : 117,
+    "page number" : 8,
+    "bounding box" : [ 215.04, 261.84, 232.32, 274.32 ]
+  }, {
+    "type" : "image",
+    "id" : 118,
+    "page number" : 9,
+    "bounding box" : [ 0.0, 0.0, 595.2, 841.68 ]
+  }, {
+    "type" : "image",
+    "id" : 120,
+    "page number" : 9,
+    "bounding box" : [ 46.08, 331.92, 554.88, 749.52 ]
+  }, {
+    "type" : "image",
+    "id" : 121,
+    "page number" : 9,
+    "bounding box" : [ 46.08, 422.16, 205.44, 453.84 ]
+  }, {
+    "type" : "image",
+    "id" : 119,
+    "page number" : 9,
+    "bounding box" : [ 34.56, 67.92, 439.68, 128.4 ]
+  } ]
+}

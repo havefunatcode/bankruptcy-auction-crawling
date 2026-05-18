@@ -6,132 +6,113 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Initial Setup
 ```bash
-# Create virtual environment
+# Java 11+ 필요 (opendataloader-pdf JVM 런타임)
+java -version
+
+# Python 가상환경
 python3 -m venv venv
 source venv/bin/activate  # macOS/Linux
-# venv\Scripts\activate   # Windows
 
-# Install dependencies
-pip install -r requirements_simple.txt  # Minimal dependencies
-# pip install -r requirements.txt       # Full dependencies (includes pandas)
-
-# Install Playwright browsers
+# 의존성 설치
+pip install -r requirements.txt
 playwright install
 
-# Test installation
+# 동작 확인
 python main.py --preview
+python -m pytest tests/
 ```
 
 ### Development Workflow
 ```bash
-# Always activate virtual environment first
 source venv/bin/activate
 
-# Basic crawling (list data only)
+# 목록만 크롤링
 python main.py --no-attachments --max-pages 1
 
-# Enhanced crawling with attachments
-python main.py --with-attachments --max-pages 2
+# 첨부파일 + PDF 처리
+python main.py --with-attachments --process-pdfs --max-pages 2
 
-# Debug mode (visible browser)
+# 헤드풀 디버그
 python main.py --headless false --max-pages 1
 
-# Specific pages
-python main.py --pages 1 5 10
+# PDF만 일괄 변환 (이미 다운로드된 PDF)
+python process_pdfs.py
+python process_pdfs.py --hybrid docling-fast --hybrid-fallback
+python process_pdfs.py --store-db
 ```
 
 ## Architecture Overview
 
-This is an asynchronous web crawler that scrapes Korean court bankruptcy auction notices from the Supreme Court website. The architecture follows a modular design with clear separation of concerns:
+한국 대법원 파산자 공매 공고를 비동기 크롤링하고, PDF는 **opendataloader-pdf** (Java 기반, Apache 2.0, 추출 정확도 벤치마크 #1)로 구조화 데이터를 추출한다.
 
-### Core Architecture Pattern
-The system uses a **two-tier crawling approach**:
-1. **Basic Mode**: Extracts only list-level data (pagination_handler.py)
-2. **Enhanced Mode**: Navigates to detail pages and downloads attachments (enhanced_pagination_handler.py)
+### 두 단계 처리
+1. **크롤링 단계**: Playwright로 목록·상세·첨부파일 수집 → `downloads/notice_<id>_<title>/`에 PDF 저장
+2. **PDF 추출 단계**: `opendataloader-pdf`가 단일 JVM 호출로 디렉토리를 일괄 변환 → JSON/Markdown 출력 → `PDFDocument` 도메인 모델로 어댑팅 → PostgreSQL 영속화
 
-### Key Components
+### Core Modules
 
-**Browser Management**
-- `BrowserController`: Playwright session management with specialized navigation for the target site
-- Handles complex navigation patterns including double-click fallback for detail page access
-- Manages session state and form-based pagination
+**크롤러 (`crawler/`)**
+- `browser_controller.py` — Playwright 세션, 더블클릭 fallback 등
+- `data_extractor.py` / `detail_extractor.py` — 목록·상세 HTML 파싱
+- `attachment_downloader.py` — JS 함수 / 직접 링크 양쪽 처리
+- `pagination_handler.py` — 목록 전용 크롤링
+- `enhanced_pagination_handler.py` — 상세 + 첨부 + PDF 처리
 
-**Data Pipeline**
-- `DataExtractor`: Parses HTML tables from list pages
-- `DetailExtractor`: Extracts detailed information from individual notice pages  
-- `AttachmentDownloader`: Handles JavaScript download functions and direct file downloads
-- `DataStorage`: Outputs to CSV/JSON with comprehensive summaries
+**PDF 파이프라인 (`pdf_processing/`)**
+- `models.py` — `PDFDocument`, `TextElement`, `TableElement`, `ImageElement`
+- `opendataloader_adapter.py` — opendataloader JSON → 도메인 모델
+- `batch_processor.py` — 다운로드 디렉토리 → 단일 JVM 배치 변환, notice_id 매핑
+- `pipeline.py` — `PipelineConfig` + `PDFPipeline` (config 기반 진입점)
+- `persistence.py` — `PDFDocumentRepository` (PDFDocument → DB)
 
-**Navigation Challenges**
-The target website requires specialized handling:
-- Detail page links sometimes need double-click instead of single click
-- JavaScript-based pagination using hidden forms
-- Session-dependent navigation that requires proper referrer handling
-- Mixed attachment download methods (JavaScript functions vs direct links)
+**DB (`database/`)**
+- `database_manager.py` — psycopg2 기반 저수준 CRUD
+- `schema.sql` — `pdf_documents` / `pdf_text_content` / `pdf_tables` / `pdf_images` + FTS
 
-### File Organization
+### Why opendataloader-pdf
+- 테이블 추출 정확도 0.928 (PyMuPDF 대비 큰 폭 상승), 한국어 OCR 80+ 언어 지원
+- XY-Cut++ 읽기 순서 → 다단 공고문 안정적
+- bounding box + 의미 타입(heading/paragraph/table/caption) 직접 제공
+- JVM 호출 비용이 있으므로 **반드시 배치 호출**해야 함 — `BatchPDFConverter`가 staging 디렉토리로 한 번에 묶어 처리
+
+### Hybrid (AI) Mode
+스캔본/복잡한 테이블에 대해 `config.PDF_HYBRID_MODE = "docling-fast"`로 활성화. 별도 데몬 실행 필요:
+```bash
+pip install "opendataloader-pdf[hybrid]"
+opendataloader-pdf-hybrid --port 5002 --force-ocr --ocr-lang ko,en
 ```
-crawler/
-├── browser_controller.py      # Playwright browser management
-├── data_extractor.py         # HTML parsing for list pages
-├── detail_extractor.py       # HTML parsing for detail pages
-├── attachment_downloader.py   # File download handling
-├── pagination_handler.py     # Basic list-only crawling
-├── enhanced_pagination_handler.py  # Full crawling with attachments
-└── data_storage.py           # Output generation
-```
 
-## Configuration
-
-Key settings in `config.py`:
-- `DELAY_BETWEEN_REQUESTS`: Rate limiting (default: 2.0 seconds)
-- `DOWNLOAD_ATTACHMENTS`: Enable/disable attachment downloads
-- `MAX_ATTACHMENT_SIZE_MB`: File size limits
-- `ALLOWED_EXTENSIONS`: Permitted file types for download
-- `HEADLESS`: Browser visibility for debugging
+## Configuration (`config.py`)
+- `DELAY_BETWEEN_REQUESTS`, `MAX_RETRIES` — 크롤링 속도 제한
+- `DOWNLOAD_ATTACHMENTS`, `DOWNLOADS_DIR`, `ALLOWED_EXTENSIONS`
+- `PROCESS_PDFS`, `PDF_PROCESSING_ENABLED`
+- `PDF_OUTPUT_DIR`, `PDF_IMAGE_OUTPUT`, `PDF_IMAGE_DIR`
+- `PDF_HYBRID_MODE`, `PDF_HYBRID_URL`, `PDF_HYBRID_FALLBACK`
+- `DB_*` — PostgreSQL 연결
 
 ## Output Structure
-
-**Data Files** (output/ directory):
-- `bankruptcy_auctions_YYYYMMDD_HHMMSS.csv`: Main data export
-- `bankruptcy_auctions_YYYYMMDD_HHMMSS_summary.txt`: Crawl statistics
-- `attachment_summary_YYYYMMDD_HHMMSS.json`: Download metrics
-
-**Attachments** (downloads/ directory):
 ```
-downloads/
-├── notice_405_공고제목/
-│   ├── 01_첨부파일명.pdf
-│   └── 02_다른파일.hwp
-└── notice_404_다른공고/
-    └── 01_공고문.pdf
+output/                          # 크롤링 결과 CSV/JSON
+downloads/notice_<id>_<title>/   # 다운로드된 PDF
+parsed_pdfs/                     # opendataloader-pdf JSON 출력 (.gitignored)
+extracted_images/                # PDF에서 추출된 이미지 (옵션)
+logs/                            # 실행 로그
 ```
 
-## Site-Specific Implementation Details
+## Testing
+```bash
+# 전체 단위 테스트 (빠름, JVM 없이도 동작)
+python -m pytest tests/
 
-### Navigation Patterns
-The target site uses several non-standard navigation patterns:
-- Form-based pagination with hidden pageIndex fields
-- Detail pages that require double-click on some notices
-- JavaScript download functions that trigger browser download dialogs
+# 통합 테스트(실제 JVM 호출 포함) 제외
+python -m pytest tests/ -m "not integration"
 
-### Error Recovery
-The crawler includes sophisticated error recovery for:
-- Failed page navigation (automatic retry with different click methods)
-- JavaScript download errors (fallback to direct link clicking)
-- Session timeouts (automatic re-navigation to base URL)
-- DOM state changes after page returns (fresh content extraction)
-
-### Rate Limiting
-Critical for this site - includes both time-based delays and respectful request patterns to avoid overloading the court website.
+# 통합만
+python -m pytest tests/ -m integration
+```
 
 ## Debugging
-
-**Log Analysis**: Check `logs/` directory for detailed execution logs with debug-level information about navigation attempts and failures.
-
-**Common Issues**:
-- ModuleNotFoundError: Virtual environment not activated
-- Navigation failures: Site structure may have changed, check selectors in browser_controller.py
-- Download errors: JavaScript download functions may need updated handling in attachment_downloader.py
-
-**Debug Mode**: Use `--headless false` to observe browser behavior during problematic operations.
+- 크롤러 로그: `logs/` 디렉토리
+- PDF 변환 확인: `python process_pdfs.py --downloads-dir downloads --output-dir /tmp/odl`
+- DB 연결: `python process_pdfs.py --test-db`
+- 헤드풀 브라우저: `python main.py --headless false`

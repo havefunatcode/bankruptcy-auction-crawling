@@ -5,10 +5,12 @@ lxml==4.9.3
 aiofiles==23.2.1
 python-dateutil==2.8.2
 
-# Database and PDF processing
-PyMuPDF>=1.23.0
-psycopg2-binary>=2.9.0
-Pillow>=10.0.0
+# PDF 처리 (opendataloader-pdf, Java 11+ 런타임 필요)
+opendataloader-pdf>=0.5
 
-# Optional: pandas for data analysis (Python 3.13 compatible version)
-pandas>=2.2.0
+# PostgreSQL
+psycopg2-binary>=2.9.0
+
+# 테스트
+pytest>=8.0
+pytest-asyncio>=0.23

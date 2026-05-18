@@ -58,6 +58,12 @@ downloads/
 # Extracted Images
 extracted_images/
 
+# opendataloader-pdf JSON 출력
+parsed_pdfs/
+
+# pytest
+.pytest_cache/
+
 # Debug files
 debug_*.py
 debug_*.html

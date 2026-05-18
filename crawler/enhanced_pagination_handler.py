@@ -8,15 +8,16 @@ from crawler.data_extractor import DataExtractor
 from crawler.detail_extractor import DetailExtractor
 from crawler.attachment_downloader import AttachmentDownloader
 from utils.logger import setup_logger
+import config
 from config import MAX_RETRIES, RETRY_DELAY, DOWNLOAD_ATTACHMENTS, PROCESS_PDFS, PDF_PROCESSING_ENABLED
-from pdf_processing.pdf_processor import PDFProcessor
+from pdf_processing import PDFPipeline
 
 
 class EnhancedPaginationHandler:
     """Enhanced pagination handler that processes details and downloads attachments"""
-    
-    def __init__(self, 
-                 browser_controller: BrowserController, 
+
+    def __init__(self,
+                 browser_controller: BrowserController,
                  data_extractor: DataExtractor,
                  detail_extractor: DetailExtractor,
                  attachment_downloader: Optional[AttachmentDownloader] = None):
@@ -25,22 +26,15 @@ class EnhancedPaginationHandler:
         self.detail_extractor = detail_extractor
         self.attachment_downloader = attachment_downloader
         self.logger = setup_logger(__name__)
-        
-        # Initialize PDF processor if enabled
-        self.pdf_processor = None
+
+        self.pdf_pipeline = None
         if PDF_PROCESSING_ENABLED:
             try:
-                self.pdf_processor = PDFProcessor()
-                # Test database connection and initialize if needed
-                if self.pdf_processor.test_connections():
-                    self.pdf_processor.initialize_database()
-                    self.logger.info("PDF processing enabled and database initialized")
-                else:
-                    self.logger.warning("PDF processing disabled due to database connection failure")
-                    self.pdf_processor = None
+                self.pdf_pipeline = PDFPipeline.from_config_module(config)
+                self.logger.info("PDF pipeline (opendataloader-pdf) initialized")
             except Exception as e:
-                self.logger.error(f"Failed to initialize PDF processor: {e}")
-                self.pdf_processor = None
+                self.logger.error(f"Failed to initialize PDF pipeline: {e}")
+                self.pdf_pipeline = None
         
     async def crawl_all_pages_with_details(self, 
                                          start_page: int = 1, 
@@ -106,18 +100,23 @@ class EnhancedPaginationHandler:
         
         self.logger.info(f"Enhanced crawling completed: {summary}")
         
-        # Process PDFs if enabled
+        # Process PDFs if enabled (opendataloader-pdf 배치 변환)
         pdf_stats = None
-        if PROCESS_PDFS and self.pdf_processor and download_attachments:
+        if PROCESS_PDFS and self.pdf_pipeline and download_attachments:
             try:
-                self.logger.info("Starting PDF processing for downloaded files...")
-                pdf_stats = self.pdf_processor.process_all_pdfs()
+                self.logger.info("Starting PDF batch processing (opendataloader-pdf)...")
+                batch_result = self.pdf_pipeline.run()
+                pdf_stats = {
+                    "notices_processed": len(batch_result.documents),
+                    "documents_processed": sum(len(v) for v in batch_result.documents.values()),
+                    "failed": len(batch_result.failed),
+                }
                 self.logger.info(f"PDF processing completed: {pdf_stats}")
                 summary['pdf_processing'] = pdf_stats
             except Exception as e:
                 self.logger.error(f"PDF processing failed: {e}")
                 summary['pdf_processing_error'] = str(e)
-        
+
         return {
             'notices': all_data,
             'attachments': all_attachments,

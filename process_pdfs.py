@@ -1,268 +1,119 @@
 #!/usr/bin/env python3
 """
-Standalone PDF processing script for bankruptcy auction documents
+PDF 일괄 처리 CLI (opendataloader-pdf 기반).
+
+다운로드된 파산자 공매 PDF를 한 번의 JVM 호출로 변환하고,
+JSON 출력을 디스크에 저장하거나 PostgreSQL에 영속화한다.
 """
-import asyncio
+from __future__ import annotations
+
 import argparse
 import sys
-import os
 from pathlib import Path
-from pdf_processing.pdf_processor import PDFProcessor
+
+import config
+from pdf_processing import PDFPipeline, PipelineConfig
+from pdf_processing.persistence import PDFDocumentRepository
 from utils.logger import setup_logger
 
 
-def main():
-    """Main entry point for PDF processing"""
-    
-    parser = argparse.ArgumentParser(description='Process PDF files and store in database')
-    parser.add_argument('--downloads-dir', default='downloads', help='Directory containing PDF files')
-    parser.add_argument('--notice-id', help='Process PDFs for specific notice ID only')
-    parser.add_argument('--max-files', type=int, help='Maximum number of files to process')
-    parser.add_argument('--test-db', action='store_true', help='Test database connection only')
-    parser.add_argument('--init-db', action='store_true', help='Initialize database schema only')
-    parser.add_argument('--search', help='Search PDF content in database')
-    parser.add_argument('--summary', action='store_true', help='Show processing summary from database')
-    parser.add_argument('--async-mode', action='store_true', help='Use async processing for better performance')
-    parser.add_argument('--concurrent', type=int, default=3, help='Number of concurrent async tasks')
-    
-    # Structured content options
-    parser.add_argument('--extract-structured', action='store_true', help='Extract structured content from existing PDFs')
-    parser.add_argument('--structured-summary', action='store_true', help='Show structured content summary')
-    parser.add_argument('--search-structured', help='Search in structured content')
-    parser.add_argument('--assets-by-type', help='Get assets by type from structured content')
-    
-    args = parser.parse_args()
-    
-    # Setup logging
+def _build_argparser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="opendataloader-pdf 기반 PDF 일괄 추출 + DB 저장",
+    )
+    parser.add_argument("--downloads-dir", default=None, help="PDF 입력 루트")
+    parser.add_argument("--output-dir", default=None, help="JSON 출력 디렉토리")
+    parser.add_argument("--hybrid", default=None,
+                        choices=[None, "docling-fast", "hancom-ai"],
+                        help="하이브리드 AI 모드 활성화")
+    parser.add_argument("--hybrid-url", default=None, help="원격 하이브리드 서버 URL")
+    parser.add_argument("--hybrid-fallback", action="store_true",
+                        help="하이브리드 실패 시 로컬 모드로 폴백")
+    parser.add_argument("--store-db", action="store_true",
+                        help="추출 결과를 PostgreSQL에 저장")
+    parser.add_argument("--init-db", action="store_true",
+                        help="DB 스키마 초기화 후 종료")
+    parser.add_argument("--test-db", action="store_true",
+                        help="DB 연결 테스트 후 종료")
+    return parser
+
+
+def _make_pipeline(args: argparse.Namespace) -> PDFPipeline:
+    pipeline_config = PipelineConfig.from_module(config)
+    if args.downloads_dir:
+        pipeline_config.downloads_dir = args.downloads_dir
+    if args.output_dir:
+        pipeline_config.output_dir = args.output_dir
+    if args.hybrid:
+        pipeline_config.hybrid = args.hybrid
+    if args.hybrid_url:
+        pipeline_config.hybrid_url = args.hybrid_url
+    if args.hybrid_fallback:
+        pipeline_config.hybrid_fallback = True
+    return PDFPipeline(pipeline_config)
+
+
+def main() -> int:
+    args = _build_argparser().parse_args()
     logger = setup_logger(__name__)
-    
-    try:
-        # Initialize PDF processor
-        processor = PDFProcessor(downloads_dir=args.downloads_dir)
-        
-        # Test database connection
+
+    if args.test_db or args.init_db or args.store_db:
+        try:
+            from database.database_manager import DatabaseManager
+        except ImportError as e:
+            print(f"❌ DB 모듈 로드 실패: {e}")
+            return 1
+        db = DatabaseManager()
         if args.test_db:
-            print("Testing database connection...")
-            if processor.test_connections():
-                print("✅ Database connection successful")
-                return 0
-            else:
-                print("❌ Database connection failed")
-                return 1
-        
-        # Initialize database
+            ok = db.test_connection() if hasattr(db, "test_connection") else False
+            print("✅ DB 연결 성공" if ok else "❌ DB 연결 실패")
+            return 0 if ok else 1
         if args.init_db:
-            print("Initializing database schema...")
-            if processor.initialize_database():
-                print("✅ Database schema initialized successfully")
-                return 0
-            else:
-                print("❌ Database schema initialization failed")
-                return 1
-        
-        # Show processing summary
-        if args.summary:
-            print("Processing Summary:")
-            print("=" * 50)
-            
-            summary = processor.get_processing_summary()
-            if summary:
-                for item in summary:
-                    print(f"Notice: {item['notice_id']}")
-                    print(f"  File: {item['file_name']}")
-                    print(f"  Pages: {item['page_count']}")
-                    print(f"  Text Pages: {item['pages_with_text']}")
-                    print(f"  Tables: {item['total_tables']}")
-                    print(f"  Images: {item['total_images']}")
-                    print(f"  Processed: {item['processed_at']}")
-                    print(f"  File Size: {item['total_file_size']}")
-                    print()
-            else:
-                print("No processing records found.")
-            
-            return 0
-        
-        # Search PDF content
-        if args.search:
-            print(f"Searching for: '{args.search}'")
-            print("=" * 50)
-            
-            results = processor.search_pdf_content(args.search)
-            if results:
-                for result in results:
-                    print(f"Notice: {result['notice_id']}")
-                    print(f"  File: {result['file_name']}")
-                    print(f"  Page: {result['page_number']}")
-                    print(f"  Text: {result['text_content'][:200]}...")
-                    print()
-            else:
-                print("No results found.")
-            
-            return 0
-        
-        # Extract structured content from existing PDFs
-        if args.extract_structured:
-            print("Extracting structured content from existing PDFs...")
-            print("=" * 50)
-            
-            if not processor.test_connections():
-                print("❌ Database connection failed")
-                return 1
-            
-            stats = processor.process_structured_content_batch()
-            
-            print(f"Processed Documents: {stats['processed_docs']}")
-            print(f"Failed Documents: {stats['failed_docs']}")
-            print(f"Total Documents: {stats['total_docs']}")
-            
-            if stats['failed_docs'] == 0:
-                print("✅ All documents processed successfully")
-            else:
-                print(f"⚠️ {stats['failed_docs']} documents failed processing")
-            
-            return 0
-        
-        # Show structured content summary
-        if args.structured_summary:
-            print("Structured Content Summary:")
-            print("=" * 50)
-            
-            summary = processor.get_structured_content_summary()
-            if summary:
-                for item in summary:
-                    print(f"Notice: {item['notice_id']}")
-                    print(f"  File: {item['file_name']}")
-                    print(f"  Status: {item['extraction_status']}")
-                    print(f"  Document Title: {item['document_title'] or 'N/A'}")
-                    print(f"  Asset Type: {item['asset_type'] or 'N/A'}")
-                    print(f"  Asset Count: {item['asset_count'] or 0}")
-                    print(f"  Bidding Type: {item['bidding_type'] or 'N/A'}")
-                    print(f"  Trustee: {item['trustee_org'] or 'N/A'}")
-                    print(f"  Missing Sections: {item['missing_sections_count'] or 0}")
-                    print(f"  Processed: {item['processed_at']}")
-                    print()
-            else:
-                print("No structured content found.")
-            
-            return 0
-        
-        # Search structured content
-        if args.search_structured:
-            print(f"Searching structured content for: '{args.search_structured}'")
-            print("=" * 50)
-            
-            results = processor.search_structured_content(args.search_structured)
-            if results:
-                for result in results:
-                    print(f"Notice: {result['notice_id']}")
-                    print(f"  File: {result['file_name']}")
-                    if 'section_data' in result:
-                        print(f"  Section Data: {str(result['section_data'])[:200]}...")
-                    else:
-                        # Show relevant parts of structured content
-                        content = result.get('structured_content', {})
-                        if content:
-                            sections = content.get('sections', {})
-                            for section_name, section_data in sections.items():
-                                if args.search_structured.lower() in str(section_data).lower():
-                                    print(f"  Found in {section_name}: {str(section_data)[:200]}...")
-                                    break
-                    print()
-            else:
-                print("No results found in structured content.")
-            
-            return 0
-        
-        # Get assets by type
-        if args.assets_by_type:
-            print(f"Assets of type: '{args.assets_by_type}'")
-            print("=" * 50)
-            
-            results = processor.get_assets_by_type(args.assets_by_type)
-            if results:
-                for result in results:
-                    print(f"Notice: {result['notice_id']}")
-                    print(f"  File: {result['file_name']}")
-                    print(f"  Asset Type: {result['asset_type']}")
-                    
-                    asset_data = result.get('asset', {})
-                    if asset_data:
-                        print(f"  Registration No: {asset_data.get('registration_no', 'N/A')}")
-                        print(f"  Title: {asset_data.get('title', 'N/A')}")
-                        print(f"  Application Date: {asset_data.get('application_date', 'N/A')}")
-                        print(f"  Registration Date: {asset_data.get('registration_date', 'N/A')}")
-                        print(f"  Remark: {asset_data.get('remark', 'N/A')}")
-                    print()
-            else:
-                print("No assets found of this type.")
-            
-            return 0
-        
-        # Process PDFs
-        print("Starting PDF processing...")
-        
-        # Check if downloads directory exists
-        if not os.path.exists(args.downloads_dir):
-            print(f"❌ Downloads directory not found: {args.downloads_dir}")
-            return 1
-        
-        # Initialize database if needed
-        if not processor.test_connections():
-            print("❌ Database connection failed")
-            return 1
-        
-        if not processor.initialize_database():
-            print("❌ Database initialization failed")
-            return 1
-        
-        # Process specific notice or all PDFs
-        if args.notice_id:
-            print(f"Processing PDFs for notice ID: {args.notice_id}")
-            stats = processor.process_specific_notice(args.notice_id)
-        elif args.async_mode:
-            print(f"Processing all PDFs asynchronously (max {args.concurrent} concurrent)")
-            stats = asyncio.run(processor.process_all_pdfs_async(
-                max_concurrent=args.concurrent,
-                max_files=args.max_files
-            ))
-        else:
-            print("Processing all PDFs synchronously")
-            stats = processor.process_all_pdfs(max_files=args.max_files)
-        
-        # Print results
-        print("\nProcessing Results:")
-        print("=" * 50)
-        
-        if args.notice_id:
-            print(f"Notice ID: {stats['notice_id']}")
-            print(f"Processed Files: {stats['processed_files']}")
-            print(f"Failed Files: {stats['failed_files']}")
-            
-            for file_info in stats['files']:
-                status = "✅" if file_info['success'] else "❌"
-                print(f"  {status} {file_info['file_name']}")
-        else:
-            print(f"Total Processed Files: {stats['processed_files']}")
-            print(f"Total Failed Files: {stats['failed_files']}")
-            print(f"Total Text Blocks: {stats['total_text_blocks']}")
-            print(f"Total Tables: {stats['total_tables']}")
-            print(f"Total Images: {stats['total_images']}")
-        
-        # Show final status
-        if stats['failed_files'] == 0:
-            print("✅ All files processed successfully")
-            return 0
-        else:
-            print(f"⚠️ {stats['failed_files']} files failed processing")
-            return 1
-            
-    except KeyboardInterrupt:
-        print("\n⚠️ Processing interrupted by user")
+            ok = db.initialize_database()
+            print("✅ DB 스키마 초기화 완료" if ok else "❌ DB 스키마 초기화 실패")
+            return 0 if ok else 1
+    else:
+        db = None
+
+    pipeline = _make_pipeline(args)
+    if not Path(pipeline.config.downloads_dir).exists():
+        print(f"❌ 다운로드 디렉토리가 없습니다: {pipeline.config.downloads_dir}")
         return 1
-    except Exception as e:
-        logger.error(f"PDF processing failed: {e}")
-        print(f"❌ PDF processing failed: {e}")
-        return 1
+
+    print(f"▶ PDF 변환 시작 (downloads={pipeline.config.downloads_dir}, "
+          f"hybrid={pipeline.config.hybrid or 'off'})")
+    result = pipeline.run()
+
+    total_docs = sum(len(v) for v in result.documents.values())
+    print(f"✅ 변환 완료: {len(result.documents)} notice / {total_docs} PDF")
+    if result.failed:
+        print(f"⚠️ 실패 {len(result.failed)} 건")
+        for nf in result.failed:
+            print(f"   - notice_{nf.notice_id}: {nf.source_path.name}")
+
+    if args.store_db:
+        from database.database_manager import DatabaseManager
+        db = DatabaseManager()
+        if not db.initialize_database():
+            print("❌ DB 초기화 실패 — 저장 중단")
+            return 1
+        repo = PDFDocumentRepository(db)
+        stored = 0
+        for notice_id, docs in result.documents.items():
+            for doc in docs:
+                doc.metadata.setdefault("notice_id", notice_id)
+                outcome = repo.store(doc)
+                if outcome.document_id is not None:
+                    stored += 1
+                    logger.info(
+                        "stored notice=%s file=%s id=%s texts=%d tables=%d images=%d",
+                        notice_id, doc.file_name, outcome.document_id,
+                        outcome.text_inserted, outcome.tables_inserted,
+                        outcome.images_inserted,
+                    )
+        print(f"💾 DB 저장 완료: {stored} 문서")
+
+    return 0
 
 
 if __name__ == "__main__":

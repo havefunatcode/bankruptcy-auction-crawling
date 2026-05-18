@@ -1,4 +1,0 @@
-# Database and PDF processing dependencies
-PyMuPDF>=1.23.0
-psycopg2-binary>=2.9.0
-Pillow>=10.0.0

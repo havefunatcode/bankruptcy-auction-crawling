@@ -1,291 +1,156 @@
 # Bankruptcy Auction Crawler
 
-한국 대법원 파산자 공매 정보 크롤러입니다.
-
-## 개요
-
-이 프로젝트는 https://www.scourt.go.kr/portal/notice/realestate/RealNoticeList.work 사이트에서 파산자 공매 정보를 자동으로 수집하는 Python 크롤러입니다.
+한국 대법원 파산자 공매 공고 크롤러 + opendataloader-pdf 기반 PDF 추출 파이프라인.
 
 ## 주요 기능
 
-- **자동 페이지 탐색**: 첫 페이지부터 마지막 페이지까지 자동으로 탐색
-- **데이터 추출**: 파산자 공매 정보 (관할청, 사건번호, 제목, 조회수 등) 추출
-- **첨부파일 다운로드**: 각 공고의 상세 페이지에서 PDF, DOC, HWP 등 첨부파일 자동 다운로드
-- **상세 정보 수집**: 공고 상세 내용, 연락처, 마감일자 등 세부 정보 추출
-- **다중 포맷 지원**: CSV, JSON 형식으로 데이터 저장
-- **오류 처리**: 강력한 재시도 로직과 오류 복구 메커니즘
-- **속도 제한**: 웹사이트에 부담을 주지 않는 적절한 속도 제한
-- **미리보기 모드**: 실제 크롤링 전 데이터 가용성 확인
-- **파일 관리**: 공고별로 체계적인 폴더 구조로 첨부파일 정리
+- **공고 크롤링** — Playwright 비동기 크롤러로 목록·상세·첨부파일 수집
+- **첨부파일 자동 다운로드** — JS 함수 / 직접 링크 모두 처리, 공고별 폴더로 정리
+- **PDF 추출** — [opendataloader-pdf](https://github.com/opendataloader-project/opendataloader-pdf) (Java, Apache 2.0)로 텍스트·테이블·이미지를 bounding box와 함께 추출
+- **하이브리드 OCR** — 스캔본·복잡한 테이블은 별도 AI 백엔드로 위임 (선택)
+- **PostgreSQL 영속화** — `PDFDocument` 단위 트랜잭션으로 저장
+- **CSV/JSON 출력** — 크롤링 결과를 다양한 포맷으로 저장
 
-## 완전 초기 설정
+## 사전 요구사항
 
-### 1단계: 프로젝트 다운로드
+- Python 3.10+
+- **Java 11+** (opendataloader-pdf JVM 런타임 — [Adoptium](https://adoptium.net/) 설치)
+- PostgreSQL 14+ (DB 저장이 필요한 경우, Docker 사용 가능)
+
+## 설치
+
 ```bash
-# Git으로 클론하는 경우
-git clone [repository-url]
+git clone https://github.com/havefunatcode/bankruptcy-auction-crawling.git
 cd bankruptcy-auction-crawling
 
-# 또는 ZIP 파일을 다운로드한 경우
-# 압축 해제 후 폴더로 이동
-cd bankruptcy-auction-crawling
-```
-
-### 2단계: Python 가상환경 생성
-```bash
-# Python 가상환경 생성
 python3 -m venv venv
-
-# 가상환경 활성화 (macOS/Linux)
 source venv/bin/activate
 
-# 가상환경 활성화 (Windows)
-# venv\Scripts\activate
-
-# 성공하면 프롬프트 앞에 (venv) 표시됨
-```
-
-### 3단계: 의존성 설치
-```bash
-# 필수 라이브러리 설치
-pip install -r requirements_simple.txt
-
-# 또는 모든 라이브러리 설치 (pandas 포함, Python 3.12 이하 권장)
-# pip install -r requirements.txt
-```
-
-### 4단계: Playwright 브라우저 설치
-```bash
-# 브라우저 설치 (약 300MB)
+pip install -r requirements.txt
 playwright install
-```
 
-### 5단계: 설치 검증
-```bash
-# 간단한 테스트 실행
+# Java 확인
+java -version
+
+# 동작 확인
 python main.py --preview
 ```
 
-## 새 터미널에서 실행하기
+### 하이브리드 모드 (선택)
 
-새로운 터미널을 열었을 때는 반드시 가상환경을 활성화해야 합니다:
+스캔본 PDF나 복잡한 테이블의 추출 품질을 높이려면 하이브리드 백엔드를 사용한다.
 
 ```bash
-# 1. 프로젝트 디렉토리로 이동
-cd /path/to/bankruptcy-auction-crawling
+pip install "opendataloader-pdf[hybrid]"
 
-# 2. 가상환경 활성화
-source venv/bin/activate
+# 별도 터미널에서 실행
+opendataloader-pdf-hybrid --port 5002 --force-ocr --ocr-lang ko,en
 
-# 3. 프롬프트에 (venv) 표시 확인 후 실행
-python main.py --with-attachments --max-pages 2
+# config.py
+# PDF_HYBRID_MODE = "docling-fast"
+# PDF_HYBRID_FALLBACK = True
 ```
 
 ## 사용법
 
-### 기본 사용법
-
-**일반 크롤링 (목록 정보만):**
+### 크롤러
 ```bash
-python main.py --no-attachments
-```
-
-**첨부파일 포함 크롤링 (권장):**
-```bash
-python main.py --with-attachments
-```
-
-**기본 크롤링 (설정에 따라 첨부파일 포함/제외):**
-```bash
-python main.py
-```
-
-**특정 페이지부터 시작:**
-```bash
-python main.py --with-attachments --start-page 5
-```
-
-**최대 페이지 수 제한:**
-```bash
-python main.py --with-attachments --max-pages 3
-```
-
-### 실행 예제
-
-**1-2페이지만 첨부파일 포함 크롤링:**
-```bash
-python main.py --with-attachments --start-page 1 --max-pages 2
-```
-
-**특정 페이지들만 크롤링:**
-```bash
-python main.py --pages 1 2 5
-```
-
-**빠른 기본 크롤링 (첨부파일 제외):**
-```bash
-python main.py --no-attachments --max-pages 1
-```
-
-### 미리보기 모드
-
-크롤링 전 데이터 확인:
-```bash
+# 미리보기 (페이지 범위 확인)
 python main.py --preview
+
+# 목록만
+python main.py --no-attachments --max-pages 3
+
+# 첨부파일 + PDF 추출 동시 처리
+python main.py --with-attachments --process-pdfs --max-pages 2
+
+# 특정 페이지
+python main.py --pages 1 5 10
+
+# 디버그 (헤드풀)
+python main.py --headless false --max-pages 1
 ```
 
-### 특정 페이지 크롤링
-
+### PDF 일괄 처리 (이미 다운로드된 PDF에 대해)
 ```bash
-python main.py --pages 1 5 10 15
+# 기본: downloads/ 전체를 parsed_pdfs/에 JSON으로 출력
+python process_pdfs.py
+
+# 하이브리드 모드
+python process_pdfs.py --hybrid docling-fast --hybrid-fallback
+
+# DB 저장 포함
+python process_pdfs.py --store-db
+
+# DB 연결 테스트 / 스키마 초기화
+python process_pdfs.py --test-db
+python process_pdfs.py --init-db
 ```
 
-### 브라우저 표시 모드
-
-```bash
-python main.py --headless false
-```
-
-## 설정
-
-### 기본 설정
-`config.py` 파일에서 다음 설정을 변경할 수 있습니다:
-
-- `DELAY_BETWEEN_REQUESTS`: 요청 간 지연 시간 (기본: 2초)
-- `PAGE_LOAD_TIMEOUT`: 페이지 로드 타임아웃 (기본: 30초)
-- `MAX_RETRIES`: 최대 재시도 횟수 (기본: 3회)
-- `OUTPUT_FORMAT`: 출력 형식 ("csv", "json", "both")
-- `HEADLESS`: 브라우저 헤드리스 모드 (기본: True)
-- `DOWNLOAD_ATTACHMENTS`: 첨부파일 다운로드 활성화 (기본: True)
-- `DOWNLOADS_DIR`: 첨부파일 저장 디렉토리 (기본: "downloads")
-
-### 중요한 명령어 참조
-
-**매번 새 터미널에서 실행 시:**
-```bash
-cd /path/to/bankruptcy-auction-crawling
-source venv/bin/activate
-python main.py --with-attachments --max-pages 2
-```
-
-**가상환경 상태 확인:**
-```bash
-# 프롬프트에 (venv) 표시되어야 함
-# Python 경로 확인
-which python
-```
-
-## 출력 파일
-
-### 데이터 파일
-크롤링 결과는 `output/` 디렉토리에 저장됩니다:
-
-- `bankruptcy_auctions_YYYYMMDD_HHMMSS.csv`: CSV 형식 데이터
-- `bankruptcy_auctions_YYYYMMDD_HHMMSS.json`: JSON 형식 데이터  
-- `bankruptcy_auctions_YYYYMMDD_HHMMSS_summary.txt`: 크롤링 요약 통계
-- `attachment_summary_YYYYMMDD_HHMMSS.json`: 첨부파일 다운로드 요약
-
-### 첨부파일 구조
-첨부파일은 `downloads/` 디렉토리에 공고별로 정리됩니다:
+## 출력 구조
 
 ```
-downloads/
-├── notice_405_파산재단_재고자산_일괄매각_공고/
-│   ├── 01_2024하합101142_자산매각공고문.pdf
-│   └── 02_기타_첨부파일.hwp
-├── notice_404_환가포기_공고/
-│   └── 01_환가포기_공고문.pdf
-└── ...
+output/                          # 크롤링 결과
+  bankruptcy_auctions_*.csv
+  bankruptcy_auctions_*_summary.txt
+  attachment_summary_*.json
+
+downloads/                       # 다운로드된 첨부파일
+  notice_405_공고제목/
+    01_첨부파일.pdf
+
+parsed_pdfs/                     # opendataloader-pdf JSON (.gitignored)
+  notice_405__0000__01_첨부파일.json
 ```
 
 ## 프로젝트 구조
 
 ```
 bankruptcy-auction-crawling/
-├── config.py                 # 설정 파일
-├── main.py                   # 메인 애플리케이션
-├── requirements.txt          # 의존성 목록
-├── crawler/                  # 크롤러 모듈
-│   ├── __init__.py
-│   ├── browser_controller.py       # 브라우저 제어
-│   ├── data_extractor.py           # 기본 데이터 추출
-│   ├── detail_extractor.py         # 상세 페이지 데이터 추출
-│   ├── attachment_downloader.py    # 첨부파일 다운로더
-│   ├── pagination_handler.py       # 기본 페이지네이션 처리
-│   ├── enhanced_pagination_handler.py # 첨부파일 포함 페이지네이션
-│   └── data_storage.py             # 데이터 저장
-├── utils/                    # 유틸리티 모듈
-│   ├── __init__.py
-│   ├── logger.py             # 로깅 설정
-│   └── error_handler.py      # 오류 처리
-├── output/                   # 출력 파일 디렉토리
-├── downloads/                # 첨부파일 다운로드 디렉토리
-└── logs/                     # 로그 파일 디렉토리
+├── config.py                       # 환경 설정
+├── main.py                         # 크롤러 진입점
+├── process_pdfs.py                 # PDF 일괄 처리 CLI
+├── crawler/                        # 크롤러 모듈
+│   ├── browser_controller.py
+│   ├── data_extractor.py
+│   ├── detail_extractor.py
+│   ├── attachment_downloader.py
+│   ├── pagination_handler.py
+│   ├── enhanced_pagination_handler.py
+│   └── data_storage.py
+├── pdf_processing/                 # PDF 추출 파이프라인
+│   ├── models.py                   # PDFDocument, TextElement, ...
+│   ├── opendataloader_adapter.py   # JSON → 도메인 모델
+│   ├── batch_processor.py          # 단일 JVM 배치 변환
+│   ├── pipeline.py                 # PipelineConfig + PDFPipeline
+│   └── persistence.py              # PDFDocumentRepository
+├── database/                       # PostgreSQL 계층
+│   ├── database_manager.py
+│   ├── config_db.py
+│   └── schema.sql
+├── utils/                          # 공통 유틸
+└── tests/                          # pytest 단위·통합 테스트
 ```
 
-## 로깅
+## 테스트
 
-모든 실행 과정은 `logs/` 디렉토리에 상세히 기록됩니다. 로그 레벨은 `config.py`에서 조정할 수 있습니다.
+```bash
+# 전체 (단위 + 통합)
+python -m pytest tests/ -v
+
+# 단위만 (JVM 없이도 동작)
+python -m pytest tests/ -m "not integration"
+```
+
+46개 테스트 케이스 (어댑터·배치·파이프라인·영속화 + 실제 JVM 통합).
 
 ## 주의사항
 
-- 웹사이트 서버에 부담을 주지 않도록 적절한 지연 시간을 설정하세요
-- 첨부파일 다운로드 시 충분한 디스크 공간을 확보하세요 (공고당 평균 0.5-2MB)
-- 대량 크롤링 시 네트워크 연결 상태를 확인하세요
-- 사이트 구조 변경 시 데이터 추출 로직을 업데이트해야 할 수 있습니다
-- 첨부파일 다운로드는 처리 시간이 더 오래 걸립니다 (공고당 약 3-5초 추가)
+- 사이트 부담을 줄이기 위해 `DELAY_BETWEEN_REQUESTS=2.0`초 유지를 권장
+- opendataloader-pdf는 JVM 시작 비용이 있으므로 **공고별 호출 금지** — `BatchPDFConverter`가 한 번에 처리
+- 한국어 스캔 PDF는 하이브리드 모드 권장 (로컬 모드는 이미지로만 인식됨)
+- 사이트 구조 변경 시 `crawler/browser_controller.py`, `crawler/data_extractor.py`의 셀렉터 수정 필요
 
-## 문제 해결
+## 라이선스
 
-### 가장 일반적인 문제
-
-#### 1. `ModuleNotFoundError: No module named 'playwright'`
-**원인**: 가상환경이 활성화되지 않음
-**해결책**:
-```bash
-# 프로젝트 디렉토리로 이동
-cd /path/to/bankruptcy-auction-crawling
-
-# 가상환경 활성화
-source venv/bin/activate
-
-# 프롬프트에 (venv) 표시 확인 후 재실행
-python main.py --with-attachments --max-pages 2
-```
-
-#### 2. 가상환경 활성화 확인 방법
-```bash
-# 현재 Python 경로 확인 (가상환경이 활성화된 경우)
-which python
-# 결과: /path/to/project/venv/bin/python
-
-# 설치된 패키지 확인
-pip list | grep playwright
-```
-
-#### 3. 완전 재설치가 필요한 경우
-```bash
-# 기존 가상환경 삭제
-rm -rf venv
-
-# 새로 설정
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements_simple.txt
-playwright install
-```
-
-### 기타 문제들
-
-1. **브라우저 실행 실패**: `playwright install` 명령어로 브라우저를 다시 설치하세요
-2. **페이지 로드 실패**: 네트워크 연결을 확인하고 타임아웃 설정을 늘려보세요
-3. **데이터 추출 실패**: 사이트 구조가 변경되었을 수 있습니다. 로그를 확인하세요
-4. **첨부파일 다운로드 실패**: 디스크 공간 및 네트워크 연결을 확인하세요
-
-### 로그 확인
-
-상세한 오류 정보는 `logs/` 디렉토리의 로그 파일에서 확인할 수 있습니다.
-
-## 라이센스
-
-이 프로젝트는 교육 및 연구 목적으로 제작되었습니다. 상업적 사용 시 관련 법규를 확인하시기 바랍니다.
+이 프로젝트는 교육 및 연구 목적으로 제작되었습니다. 의존 라이브러리는 모두 Apache 2.0 / MIT 호환.
