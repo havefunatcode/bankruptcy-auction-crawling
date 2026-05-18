@@ -47,7 +47,7 @@ python process_pdfs.py --store-db
 
 ### 두 단계 처리
 1. **크롤링 단계**: Playwright로 목록·상세·첨부파일 수집 → `downloads/notice_<id>_<title>/`에 PDF 저장
-2. **PDF 추출 단계**: `opendataloader-pdf`가 단일 JVM 호출로 디렉토리를 일괄 변환 → JSON/Markdown 출력 → `PDFDocument` 도메인 모델로 어댑팅 → PostgreSQL 영속화
+2. **PDF 추출 단계**: `opendataloader-pdf`가 단일 JVM 호출로 디렉토리를 일괄 변환 → JSON/Markdown 출력 → `PDFDocument` 도메인 모델로 어댑팅 → MySQL 영속화
 
 ### Core Modules
 
@@ -65,9 +65,9 @@ python process_pdfs.py --store-db
 - `pipeline.py` — `PipelineConfig` + `PDFPipeline` (config 기반 진입점)
 - `persistence.py` — `PDFDocumentRepository` (PDFDocument → DB)
 
-**DB (`database/`)**
-- `database_manager.py` — psycopg2 기반 저수준 CRUD
-- `schema.sql` — `pdf_documents` / `pdf_text_content` / `pdf_tables` / `pdf_images` + FTS
+**DB (`database/`)** — MySQL 8.0+
+- `database_manager.py` — PyMySQL 기반 저수준 CRUD
+- `schema.sql` — `pdf_documents` / `pdf_text_content` / `pdf_tables` / `pdf_images` + ngram 파서 FULLTEXT
 
 ### Why opendataloader-pdf
 - 테이블 추출 정확도 0.928 (PyMuPDF 대비 큰 폭 상승), 한국어 OCR 80+ 언어 지원
@@ -88,7 +88,7 @@ opendataloader-pdf-hybrid --port 5002 --force-ocr --ocr-lang ko,en
 - `PROCESS_PDFS`, `PDF_PROCESSING_ENABLED`
 - `PDF_OUTPUT_DIR`, `PDF_IMAGE_OUTPUT`, `PDF_IMAGE_DIR`
 - `PDF_HYBRID_MODE`, `PDF_HYBRID_URL`, `PDF_HYBRID_FALLBACK`
-- `DB_*` — PostgreSQL 연결
+- `DB_*` — MySQL 연결 (DB_HOST, DB_PORT=3306, DB_USER, DB_PASSWORD, DB_NAME, DB_CHARSET=utf8mb4)
 
 ## Output Structure
 ```

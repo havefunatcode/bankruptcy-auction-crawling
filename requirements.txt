@@ -8,8 +8,8 @@ python-dateutil==2.8.2
 # PDF 처리 (opendataloader-pdf, Java 11+ 런타임 필요)
 opendataloader-pdf>=0.5
 
-# PostgreSQL
-psycopg2-binary>=2.9.0
+# MySQL 8.0+
+PyMySQL>=1.1.0
 
 # 테스트
 pytest>=8.0

@@ -1,37 +1,53 @@
 """
-PostgreSQL 데이터 접근 계층.
+MySQL 8.0+ 데이터 접근 계층.
 
 opendataloader-pdf로 추출된 PDF 컨텐츠를 저장·조회한다.
-구조화 섹션 추출/검색 로직은 외부 도메인 계층으로 위임한다.
 """
 from __future__ import annotations
 
 import json
+import re
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-import psycopg2
-import psycopg2.extras
+import pymysql
+from pymysql.cursors import DictCursor
 
 from utils.logger import setup_logger
 from .config_db import DATABASE_CONFIG, SCHEMA_FILE
 
 
+# 빈 줄로 구분된 다중 문 SQL을 안전하게 분할하기 위한 정규식
+_SQL_STATEMENT_SPLIT = re.compile(r";\s*\n", re.MULTILINE)
+
+# get_connection(database=) 인자에서 "DB 미지정"을 표현하는 센티넬
+_DEFAULT_DB = object()
+
+
 class DatabaseManager:
-    """PDF 추출 결과를 저장·조회하는 저수준 데이터 접근 계층."""
+    """PDF 추출 결과를 저장·조회하는 저수준 데이터 접근 계층 (MySQL)."""
 
     def __init__(self) -> None:
         self.logger = setup_logger(__name__)
         self.connection_params = DATABASE_CONFIG
 
     @contextmanager
-    def get_connection(self):
+    def get_connection(self, *, database=_DEFAULT_DB):
+        """database 인자: 미지정 시 기본값 사용, None이면 DB 선택 없이 연결, 그 외는 해당 DB."""
+        params = dict(self.connection_params)
+        if database is _DEFAULT_DB:
+            pass  # 설정값 그대로
+        elif database is None:
+            params.pop("database", None)
+        else:
+            params["database"] = database
+
         conn = None
         try:
-            conn = psycopg2.connect(**self.connection_params)
+            conn = pymysql.connect(**params)
             yield conn
-        except psycopg2.Error as e:
+        except pymysql.MySQLError as e:
             self.logger.error(f"Database connection error: {e}")
             if conn:
                 conn.rollback()
@@ -44,7 +60,7 @@ class DatabaseManager:
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT 1;")
+                    cur.execute("SELECT 1")
                     cur.fetchone()
             return True
         except Exception as e:
@@ -54,36 +70,48 @@ class DatabaseManager:
     def initialize_database(self) -> bool:
         try:
             self._create_database_if_not_exists()
+            with open(SCHEMA_FILE, encoding="utf-8") as f:
+                schema_sql = f.read()
+            statements = self._split_sql_statements(schema_sql)
             with self.get_connection() as conn:
-                with open(SCHEMA_FILE, encoding="utf-8") as f:
-                    schema_sql = f.read()
                 with conn.cursor() as cur:
-                    cur.execute(schema_sql)
-                    conn.commit()
+                    for stmt in statements:
+                        cur.execute(stmt)
+                conn.commit()
             self.logger.info("Database schema initialized")
             return True
         except Exception as e:
             self.logger.error(f"Failed to initialize database: {e}")
             return False
 
+    @staticmethod
+    def _split_sql_statements(sql: str) -> List[str]:
+        # 주석 제거 및 빈 문장 필터링
+        cleaned: List[str] = []
+        for chunk in _SQL_STATEMENT_SPLIT.split(sql):
+            stripped = chunk.strip()
+            if not stripped:
+                continue
+            if stripped.startswith("--"):
+                # 단일 주석만 있는 경우
+                if "\n" not in stripped:
+                    continue
+            cleaned.append(stripped)
+        return cleaned
+
     def _create_database_if_not_exists(self) -> None:
+        target = self.connection_params.get("database")
+        if not target:
+            return
         try:
-            default_params = self.connection_params.copy()
-            default_params["database"] = "postgres"
-            with psycopg2.connect(**default_params) as conn:
-                conn.autocommit = True
+            with self.get_connection(database=None) as conn:
+                conn.autocommit(True)
                 with conn.cursor() as cur:
                     cur.execute(
-                        "SELECT 1 FROM pg_database WHERE datname = %s",
-                        (self.connection_params["database"],),
+                        f"CREATE DATABASE IF NOT EXISTS `{target}` "
+                        f"CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
                     )
-                    if not cur.fetchone():
-                        cur.execute(
-                            f"CREATE DATABASE {self.connection_params['database']}"
-                        )
-                        self.logger.info(
-                            f"Created database: {self.connection_params['database']}"
-                        )
+            self.logger.info(f"Ensured database exists: {target}")
         except Exception as e:
             self.logger.warning(f"Could not ensure database exists: {e}")
 
@@ -98,24 +126,24 @@ class DatabaseManager:
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cur:
+                    # UPSERT: ON DUPLICATE KEY UPDATE로 갱신 후 ID 회수
                     cur.execute(
                         """
                         INSERT INTO pdf_documents
                             (notice_id, file_path, file_name, file_size, page_count, processed_at)
                         VALUES (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (notice_id, file_name) DO UPDATE SET
-                            file_path = EXCLUDED.file_path,
-                            file_size = EXCLUDED.file_size,
-                            page_count = EXCLUDED.page_count,
-                            processed_at = EXCLUDED.processed_at,
-                            updated_at = CURRENT_TIMESTAMP
-                        RETURNING id;
+                        ON DUPLICATE KEY UPDATE
+                            file_path = VALUES(file_path),
+                            file_size = VALUES(file_size),
+                            page_count = VALUES(page_count),
+                            processed_at = VALUES(processed_at),
+                            id = LAST_INSERT_ID(id)
                         """,
                         (notice_id, file_path, file_name, file_size, page_count, datetime.now()),
                     )
-                    document_id = cur.fetchone()[0]
-                    conn.commit()
-                    return document_id
+                    document_id = cur.lastrowid
+                conn.commit()
+                return document_id
         except Exception as e:
             self.logger.error(f"Failed to insert PDF document: {e}")
             return None
@@ -138,7 +166,7 @@ class DatabaseManager:
                             (document_id, page_number, text_content,
                              bbox_x0, bbox_y0, bbox_x1, bbox_y1,
                              font_size, font_name)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
                             document_id, page_number, text_content,
@@ -146,7 +174,7 @@ class DatabaseManager:
                             font_size, font_name,
                         ),
                     )
-                    conn.commit()
+                conn.commit()
             return True
         except Exception as e:
             self.logger.error(f"Failed to insert text content: {e}")
@@ -174,7 +202,7 @@ class DatabaseManager:
                             (document_id, page_number, table_index,
                              table_data, row_count, col_count,
                              bbox_x0, bbox_y0, bbox_x1, bbox_y1)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
                             document_id, page_number, table_index,
@@ -183,7 +211,7 @@ class DatabaseManager:
                             bbox[0], bbox[1], bbox[2], bbox[3],
                         ),
                     )
-                    conn.commit()
+                conn.commit()
             return True
         except Exception as e:
             self.logger.error(f"Failed to insert table data: {e}")
@@ -210,7 +238,7 @@ class DatabaseManager:
                             (document_id, page_number, image_index, image_path,
                              width, height, format, file_size,
                              bbox_x0, bbox_y0, bbox_x1, bbox_y1)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         (
                             document_id, page_number, image_index, image_path,
@@ -218,7 +246,7 @@ class DatabaseManager:
                             bbox[0], bbox[1], bbox[2], bbox[3],
                         ),
                     )
-                    conn.commit()
+                conn.commit()
             return True
         except Exception as e:
             self.logger.error(f"Failed to insert image data: {e}")
@@ -229,16 +257,12 @@ class DatabaseManager:
     ) -> Optional[Dict[str, Any]]:
         try:
             with self.get_connection() as conn:
-                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                with conn.cursor(DictCursor) as cur:
                     cur.execute(
-                        """
-                        SELECT * FROM pdf_documents
-                        WHERE notice_id = %s AND file_name = %s;
-                        """,
+                        "SELECT * FROM pdf_documents WHERE notice_id = %s AND file_name = %s",
                         (notice_id, file_name),
                     )
-                    row = cur.fetchone()
-                    return dict(row) if row else None
+                    return cur.fetchone()
         except Exception as e:
             self.logger.error(f"Failed to get document: {e}")
             return None
@@ -246,9 +270,9 @@ class DatabaseManager:
     def get_processing_summary(self, limit: int = 100) -> List[Dict[str, Any]]:
         try:
             with self.get_connection() as conn:
-                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-                    cur.execute("SELECT * FROM pdf_processing_summary LIMIT %s;", (limit,))
-                    return [dict(row) for row in cur.fetchall()]
+                with conn.cursor(DictCursor) as cur:
+                    cur.execute("SELECT * FROM pdf_processing_summary LIMIT %s", (limit,))
+                    return list(cur.fetchall())
         except Exception as e:
             self.logger.error(f"Failed to get processing summary: {e}")
             return []
@@ -256,9 +280,10 @@ class DatabaseManager:
     def search_text_content(
         self, search_term: str, limit: int = 50
     ) -> List[Dict[str, Any]]:
+        """ngram 파서 기반 전문 검색."""
         try:
             with self.get_connection() as conn:
-                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                with conn.cursor(DictCursor) as cur:
                     cur.execute(
                         """
                         SELECT pd.notice_id, pd.file_name, ptc.page_number,
@@ -266,14 +291,13 @@ class DatabaseManager:
                                ptc.bbox_x1, ptc.bbox_y1
                         FROM pdf_text_content ptc
                         JOIN pdf_documents pd ON ptc.document_id = pd.id
-                        WHERE to_tsvector('simple', ptc.text_content)
-                              @@ plainto_tsquery('simple', %s)
+                        WHERE MATCH(ptc.text_content) AGAINST (%s IN NATURAL LANGUAGE MODE)
                         ORDER BY pd.processed_at DESC
-                        LIMIT %s;
+                        LIMIT %s
                         """,
                         (search_term, limit),
                     )
-                    return [dict(row) for row in cur.fetchall()]
+                    return list(cur.fetchall())
         except Exception as e:
             self.logger.error(f"Failed to search text content: {e}")
             return []
@@ -282,11 +306,9 @@ class DatabaseManager:
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute(
-                        "DELETE FROM pdf_documents WHERE id = %s;", (document_id,)
-                    )
+                    cur.execute("DELETE FROM pdf_documents WHERE id = %s", (document_id,))
                     affected = cur.rowcount
-                    conn.commit()
+                conn.commit()
             return affected > 0
         except Exception as e:
             self.logger.error(f"Failed to delete document data: {e}")

@@ -15,7 +15,7 @@
 
 - Python 3.10+
 - **Java 11+** (opendataloader-pdf JVM 런타임 — [Adoptium](https://adoptium.net/) 설치)
-- PostgreSQL 14+ (DB 저장이 필요한 경우, Docker 사용 가능)
+- MySQL 8.0+ (DB 저장이 필요한 경우, Docker 사용 가능)
 
 ## 설치
 
@@ -124,10 +124,10 @@ bankruptcy-auction-crawling/
 │   ├── batch_processor.py          # 단일 JVM 배치 변환
 │   ├── pipeline.py                 # PipelineConfig + PDFPipeline
 │   └── persistence.py              # PDFDocumentRepository
-├── database/                       # PostgreSQL 계층
+├── database/                       # MySQL 계층 (PyMySQL)
 │   ├── database_manager.py
 │   ├── config_db.py
-│   └── schema.sql
+│   └── schema.sql                  # utf8mb4 + ngram FULLTEXT
 ├── utils/                          # 공통 유틸
 └── tests/                          # pytest 단위·통합 테스트
 ```
@@ -142,7 +142,18 @@ python -m pytest tests/ -v
 python -m pytest tests/ -m "not integration"
 ```
 
-46개 테스트 케이스 (어댑터·배치·파이프라인·영속화 + 실제 JVM 통합).
+59개 테스트 케이스 (어댑터·배치·파이프라인·영속화·DB 매니저 + 실제 JVM/MySQL 통합).
+
+### MySQL 통합 테스트 실행
+```bash
+# Docker로 MySQL 띄운 뒤
+docker run -d --name mysql-test -e MYSQL_ROOT_PASSWORD=testpass -p 3307:3306 mysql:8
+
+# 환경 변수로 연결 정보 주입
+DB_HOST=127.0.0.1 DB_PORT=3307 DB_USER=root DB_PASSWORD=testpass \
+DB_NAME=bankruptcy_auction_test \
+python -m pytest tests/ -m integration
+```
 
 ## 주의사항
 

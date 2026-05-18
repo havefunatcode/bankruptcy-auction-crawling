@@ -39,13 +39,14 @@ PDF_HYBRID_MODE = None  # None | "docling-fast" | "hancom-ai"
 PDF_HYBRID_URL = None  # 원격 서버 사용 시 "http://host:5002"
 PDF_HYBRID_FALLBACK = False  # 하이브리드 실패 시 로컬 모드로 폴백
 
-# Database Configuration
-DB_ENABLED = True  # Enable database functionality
-DB_HOST = "localhost"  # Docker PostgreSQL host
-DB_PORT = 5432  # Docker PostgreSQL port
-DB_NAME = "bankruptcy_auction"  # Database name
-DB_USER = "postgres"  # Database user
-DB_PASSWORD = "postgres"  # Database password
+# Database Configuration (MySQL 8.0+)
+DB_ENABLED = True
+DB_HOST = "localhost"
+DB_PORT = 3306
+DB_NAME = "bankruptcy_auction"
+DB_USER = "root"
+DB_PASSWORD = ""
+DB_CHARSET = "utf8mb4"
 
 # Logging Configuration
 LOG_LEVEL = "INFO"
