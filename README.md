@@ -8,7 +8,7 @@
 - **첨부파일 자동 다운로드** — JS 함수 / 직접 링크 모두 처리, 공고별 폴더로 정리
 - **PDF 추출** — [opendataloader-pdf](https://github.com/opendataloader-project/opendataloader-pdf) (Java, Apache 2.0)로 텍스트·테이블·이미지를 bounding box와 함께 추출
 - **하이브리드 OCR** — 스캔본·복잡한 테이블은 별도 AI 백엔드로 위임 (선택)
-- **PostgreSQL 영속화** — `PDFDocument` 단위 트랜잭션으로 저장
+- **MySQL 영속화** — `PDFDocument` 단위 트랜잭션으로 저장
 - **CSV/JSON 출력** — 크롤링 결과를 다양한 포맷으로 저장
 
 ## 사전 요구사항
